@@ -20,7 +20,7 @@
 #include "Configuration.h"
 
 //Global variables
-size_t HopLimitIndex[]{0, 0};
+size_t ParameterHopLimitIndex[]{0, 0};
 
 //Read texts
 bool ReadText(
@@ -28,20 +28,20 @@ bool ReadText(
 	const size_t InputType, 
 	const size_t FileIndex)
 {
+//Reset global variables.
+	if (InputType == READ_TEXT_PARAMETER_NORMAL || InputType == READ_TEXT_PARAMETER_MONITOR)
+	{
+		ParameterHopLimitIndex[NETWORK_LAYER_IPV6] = 0;
+		ParameterHopLimitIndex[NETWORK_LAYER_IPV4] = 0;
+	}
+
 //Initialization
 	std::shared_ptr<uint8_t> FileBuffer(new uint8_t[FILE_BUFFER_SIZE]()), TextBuffer(new uint8_t[FILE_BUFFER_SIZE]());
 	memset(FileBuffer.get(), 0, FILE_BUFFER_SIZE);
 	memset(TextBuffer.get(), 0, FILE_BUFFER_SIZE);
 	std::string TextData;
 	size_t Encoding = 0, Index = 0, Line = 0, LabelType = 0;
-	auto IsEraseBOM = true, NewLine_Point = false, IsLabelComments = false;
-
-//Reset global variables.
-	if (InputType == READ_TEXT_PARAMETER || InputType == READ_TEXT_PARAMETER_MONITOR)
-	{
-		HopLimitIndex[NETWORK_LAYER_IPV6] = 0;
-		HopLimitIndex[NETWORK_LAYER_IPV4] = 0;
-	}
+	auto IsEraseBOM = true, NewLinePoint = false, IsStopLabel = false;
 
 //Read data.
 	while (!feof((FILE *)FileHandle))
@@ -127,7 +127,7 @@ bool ReadText(
 			uint16_t SingleText = 0;
 			for (Index = 0;Index < ReadLength;)
 			{
-			//About this check process, see https://en.wikipedia.org/wiki/UTF-8.
+			//About this check process, visit https://en.wikipedia.org/wiki/UTF-8.
 				if (FileBuffer.get()[Index] > 0xE0 && Index >= 3U)
 				{
 					SingleText = (((uint16_t)(FileBuffer.get()[Index] & 0x0F)) << 12U) + (((uint16_t)(FileBuffer.get()[Index + 1U] & 0x3F)) << 6U) + (uint16_t)(FileBuffer.get()[Index + 2U] & 0x3F);
@@ -270,7 +270,7 @@ bool ReadText(
 				{
 					PrintError(LOG_LEVEL_2, LOG_ERROR_PARAMETER, L"Text encoding error", 0, FileList_IPFilter.at(FileIndex).FileName.c_str(), 0);
 				}break;
-				case READ_TEXT_PARAMETER: //ReadParameter
+				case READ_TEXT_PARAMETER_NORMAL: //ReadParameter
 				{
 					PrintError(LOG_LEVEL_2, LOG_ERROR_PARAMETER, L"Text encoding error", 0, FileList_Config.at(FileIndex).FileName.c_str(), 0);
 				}break;
@@ -291,15 +291,15 @@ bool ReadText(
 				TextBuffer.get()[strnlen_s((const char *)TextBuffer.get(), FILE_BUFFER_SIZE)] = FileBuffer.get()[Index];
 
 			//Mark next line format.
-				if (!NewLine_Point && FileBuffer.get()[Index] == ASCII_LF)
-					NewLine_Point = true;
+				if (!NewLinePoint && FileBuffer.get()[Index] == ASCII_LF)
+					NewLinePoint = true;
 			}
 		}
 
 		memset(FileBuffer.get(), 0, FILE_BUFFER_SIZE);
 
 	//Line length check
-		if (!NewLine_Point && ReadLength == FILE_BUFFER_SIZE)
+		if (!NewLinePoint && ReadLength == FILE_BUFFER_SIZE)
 		{
 			switch (InputType)
 			{
@@ -311,7 +311,7 @@ bool ReadText(
 				{
 					PrintError(LOG_LEVEL_2, LOG_ERROR_IPFILTER, L"Data of a line is too long", 0, FileList_IPFilter.at(FileIndex).FileName.c_str(), Line);
 				}break;
-				case READ_TEXT_PARAMETER: //ReadParameter
+				case READ_TEXT_PARAMETER_NORMAL: //ReadParameter
 				{
 					PrintError(LOG_LEVEL_2, LOG_ERROR_PARAMETER, L"Data of a line is too long", 0, FileList_Config.at(FileIndex).FileName.c_str(), Line);
 				}break;
@@ -324,7 +324,7 @@ bool ReadText(
 			return false;
 		}
 		else {
-			NewLine_Point = false;
+			NewLinePoint = false;
 		}
 
 	//Read data.
@@ -342,20 +342,20 @@ bool ReadText(
 					{
 						case READ_TEXT_HOSTS: //ReadHosts
 						{
-							ReadHostsData(TextData, FileIndex, LabelType, Line, IsLabelComments);
+							ReadHostsData(TextData, FileIndex, Line, LabelType, IsStopLabel);
 						}break;
 						case READ_TEXT_IPFILTER: //ReadIPFilter
 						{
-							ReadIPFilterData(TextData, FileIndex, LabelType, Line, IsLabelComments);
+							ReadIPFilterData(TextData, FileIndex, Line, LabelType, IsStopLabel);
 						}break;
-						case READ_TEXT_PARAMETER: //ReadParameter
+						case READ_TEXT_PARAMETER_NORMAL: //ReadParameter
 						{
-							if (!ReadParameterData(TextData, FileIndex, true, Line, IsLabelComments))
+							if (!ReadParameterData(TextData, FileIndex, true, Line))
 								return false;
 						}break;
 						case READ_TEXT_PARAMETER_MONITOR: //ReadParameter(Monitor mode)
 						{
-							if (!ReadParameterData(TextData, FileIndex, false, Line, IsLabelComments))
+							if (!ReadParameterData(TextData, FileIndex, false, Line))
 								return false;
 						}break;
 					}
@@ -378,42 +378,6 @@ bool ReadText(
 	return true;
 }
 
-//Check Multiple line comments
-bool ReadMultipleLineComments(
-	std::string &Data, 
-	bool &IsLabelComments)
-{
-//Label check
-	if (IsLabelComments)
-	{
-		if (Data.find("*/") != std::string::npos && Data.find("*/") + strlen("*/") < Data.length())
-		{
-			std::string DataTemp(Data, Data.find("*/") + strlen("*/"), Data.length() - (Data.find("*/") + strlen("*/")));
-			Data = DataTemp;
-			IsLabelComments = false;
-		}
-		else {
-			return false;
-		}
-	}
-
-//Begin and end signs check
-	while (Data.find("/*") != std::string::npos)
-	{
-		if (Data.find("*/") == std::string::npos)
-		{
-			Data.erase(Data.find("/*"), Data.length() - Data.find("/*"));
-			IsLabelComments = true;
-			break;
-		}
-		else {
-			Data.erase(Data.find("/*"), Data.find("*/") - Data.find("/*") + strlen("/*"));
-		}
-	}
-
-	return true;
-}
-
 //Read parameter from file
 bool ReadParameter(
 	const bool IsFirstRead)
@@ -424,7 +388,7 @@ bool ReadParameter(
 	if (IsFirstRead)
 	{
 		const wchar_t *ConfigFileNameList[]{CONFIG_FILE_NAME_LIST};
-	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		const char *sConfigFileNameList[]{CONFIG_FILE_NAME_LIST_STRING};
 	#endif
 
@@ -433,9 +397,9 @@ bool ReadParameter(
 		{
 			ConfigFileTemp.FileName = GlobalRunningStatus.Path_Global->front();
 			ConfigFileTemp.FileName.append(ConfigFileNameList[FileIndex]);
-		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			ConfigFileTemp.sFileName = GlobalRunningStatus.sPath_Global->front();
-			ConfigFileTemp.sFileName.append(sConfigFileNameList[FileIndex]);
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			ConfigFileTemp.MBS_FileName = GlobalRunningStatus.MBS_Path_Global->front();
+			ConfigFileTemp.MBS_FileName.append(sConfigFileNameList[FileIndex]);
 		#endif
 			ConfigFileTemp.ModificationTime = 0;
 
@@ -448,7 +412,7 @@ bool ReadParameter(
 #if defined(PLATFORM_WIN)
 	WIN32_FILE_ATTRIBUTE_DATA FileAttributeData;
 	memset(&FileAttributeData, 0, sizeof(FileAttributeData));
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	struct stat FileStatData;
 	memset(&FileStatData, 0, sizeof(FileStatData));
 #endif
@@ -461,8 +425,8 @@ bool ReadParameter(
 		{
 		#if defined(PLATFORM_WIN)
 			if (_wfopen_s(&FileHandle, FileList_Config.at(FileIndex).FileName.c_str(), L"rb") != 0 || FileHandle == nullptr)
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			FileHandle = fopen(FileList_Config.at(FileIndex).sFileName.c_str(), "rb");
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			FileHandle = fopen(FileList_Config.at(FileIndex).MBS_FileName.c_str(), "rb");
 			if (FileHandle == nullptr)
 		#endif
 			{
@@ -497,8 +461,8 @@ bool ReadParameter(
 				return false;
 			}
 		}
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		if (stat(FileList_Config.at(FileIndex).sFileName.c_str(), &FileStatData) == 0 && FileStatData.st_size >= (off_t)FILE_READING_MAXSIZE)
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		if (stat(FileList_Config.at(FileIndex).MBS_FileName.c_str(), &FileStatData) == 0 && FileStatData.st_size >= (off_t)FILE_READING_MAXSIZE)
 		{
 			PrintError(LOG_LEVEL_3, LOG_ERROR_PARAMETER, L"Configuration file is too large", 0, FileList_Config.at(FileIndex).FileName.c_str(), 0);
 			return false;
@@ -508,7 +472,7 @@ bool ReadParameter(
 	//Read data.
 		if (FileHandle != nullptr)
 		{
-			if (!ReadText(FileHandle, READ_TEXT_PARAMETER, FileIndex))
+			if (!ReadText(FileHandle, READ_TEXT_PARAMETER_NORMAL, FileIndex))
 			{
 				fclose(FileHandle);
 				return false;
@@ -522,7 +486,7 @@ bool ReadParameter(
 		}
 
 	//Check parameter list and set default values.
-		return ParameterCheckAndSetting(true, FileIndex);
+		return Parameter_CheckSetting(true, FileIndex);
 	}
 //Monitor mode
 	else {
@@ -533,8 +497,8 @@ bool ReadParameter(
 			{
 			#if defined(PLATFORM_WIN)
 				if (_wfopen_s(&FileHandle, FileList_Config.at(FileIndex).FileName.c_str(), L"rb") != 0 || FileHandle == nullptr)
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-				FileHandle = fopen(FileList_Config.at(FileIndex).sFileName.c_str(), "rb");
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+				FileHandle = fopen(FileList_Config.at(FileIndex).MBS_FileName.c_str(), "rb");
 				if (FileHandle == nullptr)
 			#endif
 				{
@@ -576,8 +540,8 @@ bool ReadParameter(
 					&FileAttributeData) == FALSE)
 			{
 				memset(&FileAttributeData, 0, sizeof(FileAttributeData));
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			if (stat(FileList_Config.at(FileIndex).sFileName.c_str(), &FileStatData) != 0)
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (stat(FileList_Config.at(FileIndex).MBS_FileName.c_str(), &FileStatData) != 0)
 			{
 				memset(&FileStatData, 0, sizeof(FileStatData));
 		#endif
@@ -589,7 +553,7 @@ bool ReadParameter(
 				FileSizeData.HighPart = FileAttributeData.nFileSizeHigh;
 				FileSizeData.LowPart = FileAttributeData.nFileSizeLow;
 				if (FileSizeData.QuadPart < 0 || (size_t)FileSizeData.QuadPart >= FILE_READING_MAXSIZE)
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (FileStatData.st_size >= (off_t)FILE_READING_MAXSIZE)
 			#endif
 				{
@@ -598,7 +562,7 @@ bool ReadParameter(
 				#if defined(PLATFORM_WIN)
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 					memset(&FileStatData, 0, sizeof(FileStatData));
 				#endif
 					FileList_Config.at(FileIndex).ModificationTime = 0;
@@ -617,7 +581,7 @@ bool ReadParameter(
 					FileList_Config.at(FileIndex).ModificationTime = FileSizeData.QuadPart;
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (FileList_Config.at(FileIndex).ModificationTime == 0 || FileStatData.st_mtime != FileList_Config.at(FileIndex).ModificationTime)
 				{
 					FileList_Config.at(FileIndex).ModificationTime = FileStatData.st_mtime;
@@ -629,8 +593,8 @@ bool ReadParameter(
 				#if defined(PLATFORM_WIN)
 					if (_wfopen_s(&FileHandle, FileList_Config.at(FileIndex).FileName.c_str(), L"rb") == 0)
 					{
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-					FileHandle = fopen(FileList_Config.at(FileIndex).sFileName.c_str(), "rb");
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+					FileHandle = fopen(FileList_Config.at(FileIndex).MBS_FileName.c_str(), "rb");
 				#endif
 						if (FileHandle == nullptr)
 						{
@@ -644,7 +608,7 @@ bool ReadParameter(
 								if (ReadText(FileHandle, READ_TEXT_PARAMETER_MONITOR, FileIndex))
 								{
 								//Copy to global list.
-									if (ParameterCheckAndSetting(false, FileIndex))
+									if (Parameter_CheckSetting(false, FileIndex))
 									{
 										ParameterModificating.MonitorItemToUsing(&Parameter);
 									#if defined(ENABLE_LIBSODIUM)
@@ -676,7 +640,7 @@ bool ReadParameter(
 				#if defined(PLATFORM_WIN)
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 					memset(&FileStatData, 0, sizeof(FileStatData));
 				#endif
 				}
@@ -684,7 +648,7 @@ bool ReadParameter(
 
 		//Flush DNS cache and Auto-refresh
 			if (IsFileModified)
-				FlushDNSCache(nullptr);
+				Flush_DNS_Cache(nullptr);
 
 			Sleep(Parameter.FileRefreshTime);
 		}
@@ -712,9 +676,9 @@ void ReadIPFilter(
 		//Add to global list.
 			FileDataTemp.FileName = GlobalRunningStatus.Path_Global->at(Index);
 			FileDataTemp.FileName.append(GlobalRunningStatus.FileList_IPFilter->at(FileIndex));
-		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			FileDataTemp.sFileName = GlobalRunningStatus.sPath_Global->at(Index);
-			FileDataTemp.sFileName.append(GlobalRunningStatus.sFileList_IPFilter->at(FileIndex));
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			FileDataTemp.MBS_FileName = GlobalRunningStatus.MBS_Path_Global->at(Index);
+			FileDataTemp.MBS_FileName.append(GlobalRunningStatus.MBS_FileList_IPFilter->at(FileIndex));
 		#endif
 			FileDataTemp.ModificationTime = 0;
 
@@ -730,7 +694,7 @@ void ReadIPFilter(
 	LARGE_INTEGER FileSizeData;
 	memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 	memset(&FileSizeData, 0, sizeof(FileSizeData));
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	struct stat FileStatData;
 	memset(&FileStatData, 0, sizeof(FileStatData));
 #endif
@@ -752,8 +716,8 @@ void ReadIPFilter(
 					&FileAttributeData) == FALSE)
 			{
 				memset(&FileAttributeData, 0, sizeof(FileAttributeData));
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			if (stat(FileList_IPFilter.at(FileIndex).sFileName.c_str(), &FileStatData) != 0)
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (stat(FileList_IPFilter.at(FileIndex).MBS_FileName.c_str(), &FileStatData) != 0)
 			{
 				memset(&FileStatData, 0, sizeof(FileStatData));
 		#endif
@@ -769,7 +733,7 @@ void ReadIPFilter(
 				FileSizeData.HighPart = FileAttributeData.nFileSizeHigh;
 				FileSizeData.LowPart = FileAttributeData.nFileSizeLow;
 				if (FileSizeData.QuadPart < 0 || (size_t)FileSizeData.QuadPart >= FILE_READING_MAXSIZE)
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (FileStatData.st_size >= (off_t)FILE_READING_MAXSIZE)
 			#endif
 				{
@@ -778,7 +742,7 @@ void ReadIPFilter(
 				#if defined(PLATFORM_WIN)
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 					memset(&FileStatData, 0, sizeof(FileStatData));
 				#endif
 					if (FileList_IPFilter.at(FileIndex).ModificationTime > 0)
@@ -799,7 +763,7 @@ void ReadIPFilter(
 					FileList_IPFilter.at(FileIndex).ModificationTime = FileSizeData.QuadPart;
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (FileList_IPFilter.at(FileIndex).ModificationTime == 0 || FileStatData.st_mtime != FileList_IPFilter.at(FileIndex).ModificationTime)
 				{
 					FileList_IPFilter.at(FileIndex).ModificationTime = FileStatData.st_mtime;
@@ -812,8 +776,8 @@ void ReadIPFilter(
 				#if defined(PLATFORM_WIN)
 					if (_wfopen_s(&FileHandle, FileList_IPFilter.at(FileIndex).FileName.c_str(), L"rb") == 0)
 					{
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-					FileHandle = fopen(FileList_IPFilter.at(FileIndex).sFileName.c_str(), "rb");
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+					FileHandle = fopen(FileList_IPFilter.at(FileIndex).MBS_FileName.c_str(), "rb");
 				#endif
 						if (FileHandle == nullptr)
 						{
@@ -854,7 +818,7 @@ void ReadIPFilter(
 				#if defined(PLATFORM_WIN)
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 					memset(&FileStatData, 0, sizeof(FileStatData));
 				#endif
 				}
@@ -878,7 +842,7 @@ void ReadIPFilter(
 		IPFilterFileSetModificating->shrink_to_fit();
 
 	//Flush DNS cache and Auto-refresh
-		FlushDNSCache(nullptr);
+		Flush_DNS_Cache(nullptr);
 		Sleep(Parameter.FileRefreshTime);
 	}
 
@@ -904,9 +868,9 @@ void ReadHosts(
 		//Add to global list.
 			FileDataTemp.FileName = GlobalRunningStatus.Path_Global->at(Index);
 			FileDataTemp.FileName.append(GlobalRunningStatus.FileList_Hosts->at(FileIndex));
-		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			FileDataTemp.sFileName = GlobalRunningStatus.sPath_Global->at(Index);
-			FileDataTemp.sFileName.append(GlobalRunningStatus.sFileList_Hosts->at(FileIndex));
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			FileDataTemp.MBS_FileName = GlobalRunningStatus.MBS_Path_Global->at(Index);
+			FileDataTemp.MBS_FileName.append(GlobalRunningStatus.MBS_FileList_Hosts->at(FileIndex));
 		#endif
 			FileDataTemp.ModificationTime = 0;
 
@@ -922,7 +886,7 @@ void ReadHosts(
 	LARGE_INTEGER FileSizeData;
 	memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 	memset(&FileSizeData, 0, sizeof(FileSizeData));
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	struct stat FileStatData;
 	memset(&FileStatData, 0, sizeof(FileStatData));
 #endif
@@ -944,8 +908,8 @@ void ReadHosts(
 					&FileAttributeData) == FALSE)
 			{
 				memset(&FileAttributeData, 0, sizeof(FileAttributeData));
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			if (stat(FileList_Hosts.at(FileIndex).sFileName.c_str(), &FileStatData) != 0)
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (stat(FileList_Hosts.at(FileIndex).MBS_FileName.c_str(), &FileStatData) != 0)
 			{
 				memset(&FileStatData, 0, sizeof(FileStatData));
 		#endif
@@ -961,7 +925,7 @@ void ReadHosts(
 				FileSizeData.HighPart = FileAttributeData.nFileSizeHigh;
 				FileSizeData.LowPart = FileAttributeData.nFileSizeLow;
 				if (FileSizeData.QuadPart < 0 || (size_t)FileSizeData.QuadPart >= FILE_READING_MAXSIZE)
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (FileStatData.st_size >= (off_t)FILE_READING_MAXSIZE)
 			#endif
 				{
@@ -970,7 +934,7 @@ void ReadHosts(
 				#if defined(PLATFORM_WIN)
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 					memset(&FileStatData, 0, sizeof(FileStatData));
 				#endif
 					if (FileList_Hosts.at(FileIndex).ModificationTime > 0)
@@ -991,7 +955,7 @@ void ReadHosts(
 					FileList_Hosts.at(FileIndex).ModificationTime = FileSizeData.QuadPart;
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (FileList_Hosts.at(FileIndex).ModificationTime == 0 || FileStatData.st_mtime != FileList_Hosts.at(FileIndex).ModificationTime)
 				{
 					FileList_Hosts.at(FileIndex).ModificationTime = FileStatData.st_mtime;
@@ -1004,8 +968,8 @@ void ReadHosts(
 				#if defined(PLATFORM_WIN)
 					if (_wfopen_s(&FileHandle, FileList_Hosts.at(FileIndex).FileName.c_str(), L"rb") == 0)
 					{
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-					FileHandle = fopen(FileList_Hosts.at(FileIndex).sFileName.c_str(), "rb");
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+					FileHandle = fopen(FileList_Hosts.at(FileIndex).MBS_FileName.c_str(), "rb");
 				#endif
 						if (FileHandle == nullptr)
 						{
@@ -1046,7 +1010,7 @@ void ReadHosts(
 				#if defined(PLATFORM_WIN)
 					memset(&FileAttributeData, 0, sizeof(FileAttributeData));
 					memset(&FileSizeData, 0, sizeof(FileSizeData));
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 					memset(&FileStatData, 0, sizeof(FileStatData));
 				#endif
 				}
@@ -1070,7 +1034,7 @@ void ReadHosts(
 		HostsFileSetModificating->shrink_to_fit();
 
 	//Flush DNS cache and Auto-refresh
-		FlushDNSCache(nullptr);
+		Flush_DNS_Cache(nullptr);
 		Sleep(Parameter.FileRefreshTime);
 	}
 
@@ -1096,7 +1060,6 @@ void ClearModificatingListData(
 			}
 		}
 	}
-
 //Clear IPFilter file set.
 	else if (ClearType == READ_TEXT_IPFILTER)
 	{
@@ -1128,7 +1091,7 @@ void GetParameterListData(
 	ListData.clear();
 
 //Get all list data.
-	for (size_t Index = DataOffset;Index < Length;++Index)
+	for (auto Index = DataOffset;Index < Length;++Index)
 	{
 	//Last data
 		if (Index + 1U == Length)
@@ -1145,6 +1108,8 @@ void GetParameterListData(
 			else {
 				if (IsCaseConvert)
 					CaseConvert(NameString, false);
+
+			//Add char to end.
 				ListData.push_back(NameString);
 				if (KeepEmptyItem && Data.at(Index) == SeparatedSign)
 				{
@@ -1162,6 +1127,8 @@ void GetParameterListData(
 			{
 				if (IsCaseConvert)
 					CaseConvert(NameString, false);
+
+			//Add char to end.
 				ListData.push_back(NameString);
 				NameString.clear();
 			}

@@ -17,23 +17,25 @@
 // Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
+#ifndef PCAP_DNSPROXY_CONFIGURATION_H
+#define PCAP_DNSPROXY_CONFIGURATION_H
+
 #include "Base.h"
 
 //Base definitions
 //Label types definitions
-#define LABEL_STOP                            1U
-#define LABEL_IPFILTER                        2U
-#define LABEL_IPFILTER_BLACKLIST              3U
-#define LABEL_IPFILTER_LOCAL_ROUTING          4U
-#define LABEL_HOSTS_TYPE_WHITE                5U
-#define LABEL_HOSTS_TYPE_BANNED               6U
-#define LABEL_HOSTS_TYPE_WHITE_EXTENDED       7U
-#define LABEL_HOSTS_TYPE_BANNED_EXTENDED      8U
-#define LABEL_HOSTS_TYPE_NORMAL               9U
-#define LABEL_HOSTS_TYPE_CNAME                10U
-#define LABEL_HOSTS_TYPE_LOCAL                11U
-#define LABEL_HOSTS_TYPE_ADDRESS              12U
-#define LABEL_HOSTS_TYPE_SOURCE               13U
+#define LABEL_IPFILTER                        1U
+#define LABEL_IPFILTER_BLACKLIST              2U
+#define LABEL_IPFILTER_LOCAL_ROUTING          3U
+#define LABEL_HOSTS_TYPE_WHITE                4U
+#define LABEL_HOSTS_TYPE_BANNED               5U
+#define LABEL_HOSTS_TYPE_WHITE_EXTENDED       6U
+#define LABEL_HOSTS_TYPE_BANNED_EXTENDED      7U
+#define LABEL_HOSTS_TYPE_NORMAL               8U
+#define LABEL_HOSTS_TYPE_CNAME                9U
+#define LABEL_HOSTS_TYPE_LOCAL                10U
+#define LABEL_HOSTS_TYPE_ADDRESS              11U
+#define LABEL_HOSTS_TYPE_SOURCE               12U
 
 //Length definitions
 #define READ_DATA_MINSIZE                     4U
@@ -61,15 +63,20 @@ bool ReadText(
 	const FILE * const FileHandle, 
 	const size_t InputType, 
 	const size_t FileIndex);
-bool ReadMultipleLineComments(
-	std::string &Data, 
-	bool &IsLabelComments);
 void ClearModificatingListData(
 	const size_t ClearType, 
 	const size_t FileIndex);
+void GetParameterListData(
+	std::vector<std::string> &ListData, 
+	const std::string Data, 
+	const size_t DataOffset, 
+	const size_t Length, 
+	const uint8_t SeparatedSign, 
+	const bool IsCaseConvert, 
+	const bool KeepEmptyItem);
 
 //Functions in ReadParameter.cpp
-bool ParameterCheckAndSetting(
+bool Parameter_CheckSetting(
 	const bool IsFirstRead, 
 	const size_t FileIndex);
 uint16_t ServiceNameToBinary(
@@ -80,23 +87,22 @@ bool ReadParameterData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const bool IsFirstRead, 
-	const size_t Line, 
-	bool &IsLabelComments);
+	const size_t Line);
 #if defined(PLATFORM_WIN)
-bool ReadPathAndFileName(
+bool ReadName_PathFile(
 	std::string Data, 
 	const size_t DataOffset, 
 	const bool Path, 
 	std::vector<std::wstring> * const ListData, 
 	const size_t FileIndex, 
 	const size_t Line);
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-bool ReadPathAndFileName(
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+bool ReadName_PathFile(
 	std::string Data, 
 	const size_t DataOffset, 
 	const bool Path, 
 	std::vector<std::wstring> * const ListData, 
-	std::vector<std::string> * const sListData, 
+	std::vector<std::string> * const MBS_ListData, 
 	const size_t FileIndex, const size_t Line);
 #endif
 bool ReadMultipleAddresses(
@@ -106,7 +112,7 @@ bool ReadMultipleAddresses(
 	std::vector<DNS_SERVER_DATA> * const DNSServerDataList, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadSOCKSAddressAndDomain(
+bool Read_SOCKS_AddressDomain(
 	std::string Data, 
 	const size_t DataOffset, 
 	CONFIGURATION_TABLE * const ParameterPTR, 
@@ -147,9 +153,9 @@ bool ReadDNSCurveMagicNumber(
 bool ReadIPFilterData(
 	std::string Data, 
 	const size_t FileIndex, 
-	size_t &LabelType, 
 	const size_t Line, 
-	bool &IsLabelComments);
+	size_t &LabelType, 
+	bool &IsStopLabel);
 bool ReadBlacklistData(
 	std::string Data, 
 	const size_t FileIndex, 
@@ -163,6 +169,7 @@ bool ReadAddressPrefixBlock(
 	std::string OriginalData, 
 	const size_t DataOffset, 
 	ADDRESS_PREFIX_BLOCK * const AddressPrefix, 
+	const std::vector<FILE_DATA> &FileList, 
 	const size_t FileIndex, 
 	const size_t Line);
 bool ReadMainIPFilterData(
@@ -174,9 +181,9 @@ bool ReadMainIPFilterData(
 bool ReadHostsData(
 	std::string Data, 
 	const size_t FileIndex, 
-	size_t &LabelType, 
 	const size_t Line, 
-	bool &IsLabelComments);
+	size_t &LabelType, 
+	bool &IsStopLabel);
 bool ReadOtherHostsData(
 	std::string Data, 
 	const size_t FileIndex, 
@@ -196,3 +203,4 @@ bool ReadMainHostsData(
 	const size_t HostsType, 
 	const size_t FileIndex, 
 	const size_t Line);
+#endif

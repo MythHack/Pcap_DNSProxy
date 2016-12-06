@@ -29,7 +29,7 @@ Client -> Server:
 * Variable encryption data ...
 
 Server -> Client:
-*  8 bytes: The string r6fnvWJ8 (DNSCRYPT_MAGIC_RESPONSE)
+*  8 bytes: The string "r6fnvWJ8" (DNSCRYPT_MAGIC_RESPONSE)
 * 12 bytes: The client's nonce (crypto_box_NONCEBYTES / 2)
 * 12 bytes: A server-selected nonce extension (crypto_box_NONCEBYTES / 2)
 * 16 bytes: Poly1305 MAC (crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
@@ -37,7 +37,7 @@ Server -> Client:
 
 Using TCP protocol:
 * 2 bytes: DNSCurve/DNSCrypt data payload length
-* Variable DNSCurve/DNSCrypt data ...
+* Variable original DNSCurve/DNSCrypt data ...
 
 */
 
@@ -54,19 +54,19 @@ ssize_t DNSCurvePaddingData(
 		Buffer[Length] = (uint8_t)DNSCRYPT_PADDING_SIGN_STRING;
 	}
 //Check padding data sign.
-	else if (Length > (ssize_t)DNS_PACKET_MINSIZE)
+	else if (Length >= (ssize_t)DNS_PACKET_MINSIZE)
 	{
 		ssize_t Index = 0;
 
 	//Check padding data sign(0x80).
-		for (Index = Length - 1U;Index > (ssize_t)DNS_PACKET_MINSIZE;--Index)
+		for (Index = Length - 1U;Index >= (ssize_t)DNS_PACKET_MINSIZE;--Index)
 		{
 			if (Buffer[Index] == DNSCRYPT_PADDING_SIGN)
 				return Index;
 		}
 
 	//Check no null sign.
-		for (Index = Length - 1U;Index > (ssize_t)DNS_PACKET_MINSIZE;--Index)
+		for (Index = Length - 1U;Index >= (ssize_t)DNS_PACKET_MINSIZE;--Index)
 		{
 			if (Buffer[Index] > 0)
 				return Index;
@@ -88,10 +88,10 @@ bool DNSCurveVerifyKeypair(
 //Keypair, Nonce and validation data
 	if (crypto_box_keypair(
 			Test_PublicKey, 
-			Test_SecretKey.Buffer) != 0)
-				return false;
+			Test_SecretKey.Buffer) == 0)
+				memcpy_s(Validation + crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES, PublicKey, crypto_box_PUBLICKEYBYTES);
 	else 
-		memcpy_s(Validation + crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES, PublicKey, crypto_box_PUBLICKEYBYTES);
+		return false;
 
 //Make DNSCurve Test Nonce, 0x00 - 0x23(ASCII).
 	uint8_t Nonce[crypto_box_NONCEBYTES]{0};
@@ -127,10 +127,10 @@ bool DNSCurveSelectTargetSocket(
 	IsIPv6 = false;
 
 //IPv6
-	if (DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.Storage.ss_family > 0 && 
+	if (DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
 		((DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv6) || //Auto select
 		DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_IPV6 || //IPv6
-		(DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_IPV4 && DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.Storage.ss_family == 0))) //Non-IPv4
+		(DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_IPV4 && DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0))) //Non-IPv4
 	{
 		IsIPv6 = true;
 		if (Protocol == IPPROTO_TCP)
@@ -141,10 +141,10 @@ bool DNSCurveSelectTargetSocket(
 			return false;
 	}
 //IPv4
-	else if (DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.Storage.ss_family > 0 && 
+	else if (DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
 		((DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv4) || //Auto select
 		DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_IPV4 || //IPv4
-		(DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_IPV6 && DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.Storage.ss_family == 0))) //Non-IPv6
+		(DNSCurveParameter.DNSCurveProtocol_Network == REQUEST_MODE_IPV6 && DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0))) //Non-IPv6
 	{
 		IsIPv6 = false;
 		if (Protocol == IPPROTO_TCP)
@@ -168,6 +168,11 @@ PDNSCURVE_SERVER_DATA DNSCurveSelectSignatureTargetSocket(
 	size_t &ServerType, 
 	std::vector<SOCKET_DATA> &SocketDataList)
 {
+//Socket data check
+	if (SocketDataList.empty())
+		return nullptr;
+
+//Select target.
 	PDNSCURVE_SERVER_DATA PacketTarget = nullptr;
 	if (Protocol == AF_INET6)
 	{
@@ -179,9 +184,9 @@ PDNSCURVE_SERVER_DATA DNSCurveSelectSignatureTargetSocket(
 			ServerType = DNSCURVE_ALTERNATE_IPV6;
 		}
 		else { //Main
-			((PSOCKADDR_IN6)&SocketDataList.front().SockAddr)->sin6_addr = DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.IPv6.sin6_addr;
-			((PSOCKADDR_IN6)&SocketDataList.front().SockAddr)->sin6_port = DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.IPv6.sin6_port;
-			PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_IPv6;
+			((PSOCKADDR_IN6)&SocketDataList.front().SockAddr)->sin6_addr = DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.IPv6.sin6_addr;
+			((PSOCKADDR_IN6)&SocketDataList.front().SockAddr)->sin6_port = DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.IPv6.sin6_port;
+			PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6;
 			ServerType = DNSCURVE_MAIN_IPV6;
 		}
 
@@ -199,9 +204,9 @@ PDNSCURVE_SERVER_DATA DNSCurveSelectSignatureTargetSocket(
 			ServerType = DNSCURVE_ALTERNATE_IPV4;
 		}
 		else { //Main
-			((PSOCKADDR_IN)&SocketDataList.front().SockAddr)->sin_addr = DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.IPv4.sin_addr;
-			((PSOCKADDR_IN)&SocketDataList.front().SockAddr)->sin_port = DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.IPv4.sin_port;
-			PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_IPv4;
+			((PSOCKADDR_IN)&SocketDataList.front().SockAddr)->sin_addr = DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.IPv4.sin_addr;
+			((PSOCKADDR_IN)&SocketDataList.front().SockAddr)->sin_port = DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.IPv4.sin_port;
+			PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4;
 			ServerType = DNSCURVE_MAIN_IPV4;
 		}
 
@@ -226,7 +231,7 @@ bool DNSCurvePacketTargetSetting(
 		}break;
 		case DNSCURVE_MAIN_IPV6:
 		{
-			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_IPv6;
+			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6;
 		}break;
 		case DNSCURVE_ALTERNATE_IPV4:
 		{
@@ -234,7 +239,7 @@ bool DNSCurvePacketTargetSetting(
 		}break;
 		case DNSCURVE_MAIN_IPV4:
 		{
-			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_IPv4;
+			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4;
 		}break;
 		default:
 		{
@@ -320,9 +325,9 @@ void DNSCurveSocketPrecomputation(
 	{
 	//Set target.
 		if (IsIPv6)
-			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_IPv6;
+			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6;
 		else //IPv4
-			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_IPv4;
+			*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4;
 
 	//Encryption mode check
 		if (DNSCurveParameter.IsEncryption && 
@@ -428,7 +433,7 @@ SkipMain:
 		*PacketTarget = &DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4;
 
 //Alternate
-	if ((*PacketTarget)->AddressData.Storage.ss_family > 0 && (*IsAlternate || Parameter.AlternateMultipleRequest))
+	if ((*PacketTarget)->AddressData.Storage.ss_family != 0 && (*IsAlternate || Parameter.AlternateMultipleRequest))
 	{
 	//Encryption mode check
 		if (DNSCurveParameter.IsEncryption && 
@@ -664,8 +669,10 @@ size_t DNSCurvePacketEncryption(
 //Normal mode
 	else {
 		memcpy_s(SendBuffer, SendSize, OriginalSend, Length);
+
+	//Add length of request packet(It must be written in header when transport with TCP protocol).
 		if (Protocol == IPPROTO_TCP)
-			return AddLengthDataToHeader(SendBuffer, Length, SendSize); //Add length of request packet(It must be written in header when transport with TCP protocol).
+			return AddLengthDataToHeader(SendBuffer, Length, SendSize);
 		else if (Protocol == IPPROTO_UDP)
 			return Length;
 	}
@@ -681,7 +688,7 @@ ssize_t DNSCurvePacketDecryption(
 	const size_t RecvSize, 
 	const ssize_t Length)
 {
-	ssize_t DataLength = Length;
+	auto DataLength = Length;
 
 //Encryption mode
 	if (DNSCurveParameter.IsEncryption)
@@ -733,14 +740,13 @@ bool DNSCruveGetSignatureData(
 	const size_t ServerType)
 {
 	if (ntohs(((pdns_record_txt)Buffer)->Name) == DNS_POINTER_QUERY && 
-		ntohs(((pdns_record_txt)Buffer)->Length) == ((pdns_record_txt)Buffer)->TXT_Length + 1U && ((pdns_record_txt)Buffer)->TXT_Length == DNSCRYPT_RECORD_TXT_LEN)
+		ntohs(((pdns_record_txt)Buffer)->Length) == ((pdns_record_txt)Buffer)->TXT_Length + 1U && 
+		((pdns_record_txt)Buffer)->TXT_Length == DNSCRYPT_RECORD_TXT_LEN)
 	{
 		if (sodium_memcmp(&((pdnscurve_txt_hdr)(Buffer + sizeof(dns_record_txt)))->CertMagicNumber, DNSCRYPT_CERT_MAGIC, sizeof(uint16_t)) == 0 && 
 			ntohs(((pdnscurve_txt_hdr)(Buffer + sizeof(dns_record_txt)))->MajorVersion) == DNSCURVE_VERSION_MAJOR && 
 			ntohs(((pdnscurve_txt_hdr)(Buffer + sizeof(dns_record_txt)))->MinorVersion) == DNSCURVE_VERSION_MINOR)
 		{
-			unsigned long long SignatureLength = 0;
-
 		//Get Send Magic Number, Server Fingerprint and Precomputation Key.
 			PDNSCURVE_SERVER_DATA PacketTarget = nullptr;
 			if (!DNSCurvePacketTargetSetting(ServerType, &PacketTarget))
@@ -749,6 +755,7 @@ bool DNSCruveGetSignatureData(
 		//Check Signature.
 			std::shared_ptr<uint8_t> DeBuffer(new uint8_t[PACKET_MAXSIZE]());
 			memset(DeBuffer.get(), 0, PACKET_MAXSIZE);
+			unsigned long long SignatureLength = 0;
 			if (PacketTarget == nullptr || 
 				crypto_sign_open(
 					(unsigned char *)DeBuffer.get(), 

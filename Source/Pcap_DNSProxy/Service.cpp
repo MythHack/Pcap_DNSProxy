@@ -65,6 +65,7 @@ size_t WINAPI ServiceMain(
 	if (!ServiceStatusHandle || UpdateServiceStatus(SERVICE_START_PENDING, NO_ERROR, 0, 1U, UPDATE_SERVICE_TIME) == FALSE)
 		return FALSE;
 
+//Create service event.
 	ServiceEvent = CreateEventW(
 		0, 
 		TRUE, 
@@ -73,10 +74,12 @@ size_t WINAPI ServiceMain(
 	if (!ServiceEvent || UpdateServiceStatus(SERVICE_START_PENDING, NO_ERROR, 0, 2U, STANDARD_TIMEOUT) == FALSE || ExecuteService() == FALSE)
 		return FALSE;
 
+//Update service status.
 	ServiceCurrentStatus = SERVICE_RUNNING;
 	if (UpdateServiceStatus(SERVICE_RUNNING, NO_ERROR, 0, 0, 0) == FALSE)
 		return FALSE;
 
+//Wait signal to shutdown.
 	WaitForSingleObject(
 		ServiceEvent, 
 		INFINITE);
@@ -121,15 +124,15 @@ size_t WINAPI ServiceControl(
 BOOL WINAPI ExecuteService(
 	void)
 {
-	DWORD dwThreadID = 0;
-	const HANDLE hServiceThread = CreateThread(
+	DWORD ThreadID = 0;
+	const HANDLE ServiceThread = CreateThread(
 		0, 
 		0, 
 		(PTHREAD_START_ROUTINE)ServiceProc, 
 		nullptr, 
 		0, 
-		&dwThreadID);
-	if (hServiceThread != nullptr)
+		&ThreadID);
+	if (ServiceThread != nullptr)
 	{
 		IsServiceRunning = TRUE;
 		return TRUE;
@@ -161,25 +164,25 @@ BOOL WINAPI UpdateServiceStatus(
 	const DWORD dwCheckPoint, 
 	const DWORD dwWaitHint)
 {
+//Initialization
 	SERVICE_STATUS ServiceStatus;
 	memset(&ServiceStatus, 0, sizeof(ServiceStatus));
 	ServiceStatus.dwServiceType = SERVICE_WIN32;
 	ServiceStatus.dwCurrentState = dwCurrentState;
-
 	if (dwCurrentState == SERVICE_START_PENDING)
 		ServiceStatus.dwControlsAccepted = 0;
 	else 
-		ServiceStatus.dwControlsAccepted = (SERVICE_ACCEPT_STOP|SERVICE_ACCEPT_SHUTDOWN);
+		ServiceStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
 
 	if (dwServiceSpecificExitCode == 0)
 		ServiceStatus.dwWin32ExitCode = dwWin32ExitCode;
 	else 
 		ServiceStatus.dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;
-
 	ServiceStatus.dwServiceSpecificExitCode = dwServiceSpecificExitCode;
 	ServiceStatus.dwCheckPoint = dwCheckPoint;
 	ServiceStatus.dwWaitHint = dwWaitHint;
 
+//Service status setting
 	if (SetServiceStatus(
 			ServiceStatusHandle, 
 			&ServiceStatus) == 0)
@@ -203,7 +206,7 @@ void WINAPI TerminateService(
 }
 
 //Mailslot of flush DNS cache Monitor
-bool FlushDNSMailSlotMonitor(
+bool Flush_DNS_MailSlotMonitor(
 	void)
 {
 //System security initialization
@@ -247,11 +250,12 @@ bool FlushDNSMailSlotMonitor(
 	SecurityAttributes.bInheritHandle = true;
 
 //Create mailslot.
-	const HANDLE hSlot = CreateMailslotW(
-		MAILSLOT_NAME, FILE_BUFFER_SIZE - 1U, 
+	const HANDLE MailslotHandle = CreateMailslotW(
+		MAILSLOT_NAME, 
+		FILE_BUFFER_SIZE - 1U, 
 		MAILSLOT_WAIT_FOREVER, 
 		&SecurityAttributes);
-	if (hSlot == INVALID_HANDLE_VALUE)
+	if (MailslotHandle == INVALID_HANDLE_VALUE)
 	{
 		PrintError(LOG_LEVEL_2, LOG_ERROR_SYSTEM, L"Create mailslot error", GetLastError(), nullptr, 0);
 		if (SID_Value != nullptr)
@@ -266,10 +270,10 @@ bool FlushDNSMailSlotMonitor(
 		LocalFree(SID_Value);
 
 //Initialization
-	std::shared_ptr<wchar_t> lpszBuffer(new wchar_t[FILE_BUFFER_SIZE]());
-	wmemset(lpszBuffer.get(), 0, FILE_BUFFER_SIZE);
+	std::shared_ptr<wchar_t> Buffer(new wchar_t[FILE_BUFFER_SIZE]());
+	wmemset(Buffer.get(), 0, FILE_BUFFER_SIZE);
 	std::wstring Message;
-	std::string Domain; 
+	std::string Domain;
 	DWORD cbMessage = 0;
 	BOOL Result = 0;
 
@@ -277,13 +281,13 @@ bool FlushDNSMailSlotMonitor(
 	for (;;)
 	{
 	//Reset parameters.
-		wmemset(lpszBuffer.get(), 0, FILE_BUFFER_SIZE);
+		wmemset(Buffer.get(), 0, FILE_BUFFER_SIZE);
 		cbMessage = 0;
 
 	//Read message from mailslot.
 		Result = ReadFile(
-			hSlot, 
-			lpszBuffer.get(), 
+			MailslotHandle, 
+			Buffer.get(), 
 			FILE_BUFFER_SIZE, 
 			&cbMessage, 
 			nullptr);
@@ -291,25 +295,25 @@ bool FlushDNSMailSlotMonitor(
 		{
 			PrintError(LOG_LEVEL_3, LOG_ERROR_SYSTEM, L"Mailslot read messages error", GetLastError(), nullptr, 0);
 
-			CloseHandle(hSlot);
+			CloseHandle(MailslotHandle);
 			return false;
 		}
 		else {
-			Message = lpszBuffer.get();
+			Message = Buffer.get();
 			Domain.clear();
 
 		//Read message.
 			if (Message == MAILSLOT_MESSAGE_FLUSH_DNS) //Flush all DNS cache.
 			{
-				FlushDNSCache(nullptr);
+				Flush_DNS_Cache(nullptr);
 			}
 			else if (Message.find(MAILSLOT_MESSAGE_FLUSH_DNS_DOMAIN) == 0 && //Flush single domain cache.
 				Message.length() > wcslen(MAILSLOT_MESSAGE_FLUSH_DNS_DOMAIN) + DOMAIN_MINSIZE && //Domain length check
 				Message.length() < wcslen(MAILSLOT_MESSAGE_FLUSH_DNS_DOMAIN) + DOMAIN_MAXSIZE)
 			{
-				if (WCSToMBSString(Message.c_str() + wcslen(MAILSLOT_MESSAGE_FLUSH_DNS_DOMAIN), DOMAIN_MAXSIZE, Domain) && 
+				if (WCS_To_MBS_String(Message.c_str() + wcslen(MAILSLOT_MESSAGE_FLUSH_DNS_DOMAIN), DOMAIN_MAXSIZE, Domain) && 
 					Domain.length() > DOMAIN_MINSIZE && Domain.length() < DOMAIN_MAXSIZE)
-						FlushDNSCache((const uint8_t *)Domain.c_str());
+						Flush_DNS_Cache((const uint8_t *)Domain.c_str());
 				else 
 					PrintError(LOG_LEVEL_2, LOG_ERROR_SYSTEM, L"Convert multiple byte or wide char string error", 0, nullptr, 0);
 			}
@@ -320,17 +324,17 @@ bool FlushDNSMailSlotMonitor(
 	}
 
 //Monitor terminated
-	CloseHandle(hSlot);
+	CloseHandle(MailslotHandle);
 	PrintError(LOG_LEVEL_2, LOG_ERROR_SYSTEM, L"Mailslot module Monitor terminated", 0, nullptr, 0);
 	return false;
 }
 
 //Mailslot of flush DNS cache sender
-bool WINAPI FlushDNSMailSlotSender(
+bool WINAPI Flush_DNS_MailSlotSender(
 	const wchar_t * const Domain)
 {
 //Mailslot initialization
-	const HANDLE hFile = CreateFileW(
+	const HANDLE FileHandle = CreateFileW(
 		MAILSLOT_NAME, 
 		GENERIC_WRITE, 
 		FILE_SHARE_READ, 
@@ -338,7 +342,7 @@ bool WINAPI FlushDNSMailSlotSender(
 		OPEN_EXISTING, 
 		FILE_ATTRIBUTE_NORMAL, 
 		nullptr);
-	if (hFile == INVALID_HANDLE_VALUE)
+	if (FileHandle == INVALID_HANDLE_VALUE)
 	{
 		std::wstring InnerMessage(L"[System Error] Create mailslot error");
 		if (GetLastError() == 0)
@@ -357,22 +361,22 @@ bool WINAPI FlushDNSMailSlotSender(
 
 //Message initialization
 	std::wstring Message(MAILSLOT_MESSAGE_FLUSH_DNS);
-	if (Domain != nullptr)
+	if (Domain != nullptr && wcsnlen_s(Domain, DOMAIN_MAXSIZE) > DOMAIN_MINSIZE)
 	{
 		Message.append(L": ");
 		Message.append(Domain);
 	}
 
 //Write into mailslot.
-	DWORD cbWritten = 0;
+	DWORD WrittenBytes = 0;
 	if (WriteFile(
-			hFile, 
+			FileHandle, 
 			Message.c_str(), 
 			(DWORD)(sizeof(wchar_t) * Message.length() + 1U), 
-			&cbWritten, 
+			&WrittenBytes, 
 			nullptr) == 0)
 	{
-		CloseHandle(hFile);
+		CloseHandle(FileHandle);
 		std::wstring InnerMessage(L"[System Error] Mailslot write messages error");
 		if (GetLastError() == 0)
 		{
@@ -388,16 +392,16 @@ bool WINAPI FlushDNSMailSlotSender(
 		return false;
 	}
 	else {
-		CloseHandle(hFile);
+		CloseHandle(FileHandle);
 		PrintToScreen(true, L"[Notice] Flush DNS cache message was sent successfully.\n");
 	}
 
 	return true;
 }
 
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //Flush DNS cache FIFO Monitor
-bool FlushDNSFIFOMonitor(
+bool Flush_DNS_FIFO_Monitor(
 	void)
 {
 //Initialization
@@ -414,7 +418,7 @@ bool FlushDNSFIFOMonitor(
 		unlink(FIFO_PATH_NAME);
 		errno = 0;
 		if (mkfifo(FIFO_PATH_NAME, O_CREAT) == RETURN_ERROR || 
-			chmod(FIFO_PATH_NAME, S_IRUSR|S_IWUSR|S_IWGRP|S_IWOTH) == RETURN_ERROR)
+			chmod(FIFO_PATH_NAME, S_IRUSR | S_IWUSR | S_IWGRP | S_IWOTH) == RETURN_ERROR)
 		{
 			PrintError(LOG_LEVEL_2, LOG_ERROR_SYSTEM, L"Create FIFO error", errno, nullptr, 0);
 
@@ -446,11 +450,11 @@ bool FlushDNSFIFOMonitor(
 
 		//Read message.
 			if (Message == FIFO_MESSAGE_FLUSH_DNS) //Flush all DNS cache.
-				FlushDNSCache(nullptr);
+				Flush_DNS_Cache(nullptr);
 			else if (Message.find(FIFO_MESSAGE_FLUSH_DNS_DOMAIN) == 0 && //Flush single domain cache.
 				Message.length() > strlen(FIFO_MESSAGE_FLUSH_DNS_DOMAIN) + DOMAIN_MINSIZE && //Domain length check
 				Message.length() < strlen(FIFO_MESSAGE_FLUSH_DNS_DOMAIN) + DOMAIN_MAXSIZE)
-					FlushDNSCache((const uint8_t *)Message.c_str() + strlen(FIFO_MESSAGE_FLUSH_DNS_DOMAIN));
+					Flush_DNS_Cache((const uint8_t *)Message.c_str() + strlen(FIFO_MESSAGE_FLUSH_DNS_DOMAIN));
 			else 
 				Sleep(Parameter.FileRefreshTime);
 		}
@@ -468,12 +472,12 @@ bool FlushDNSFIFOMonitor(
 }
 
 //Flush DNS cache FIFO sender
-bool FlushDNSFIFOSender(
+bool Flush_DNS_FIFO_Sender(
 	const uint8_t * const Domain)
 {
 //Message initialization
 	std::string Message(FIFO_MESSAGE_FLUSH_DNS);
-	if (Domain != nullptr)
+	if (Domain != nullptr && strnlen((const char *)Domain, DOMAIN_MAXSIZE) > DOMAIN_MINSIZE)
 	{
 		Message.append(": ");
 		Message.append((const char *)Domain);
@@ -481,7 +485,7 @@ bool FlushDNSFIFOSender(
 
 //Write into FIFO file.
 	errno = 0;
-	const int FIFO_Handle = open(FIFO_PATH_NAME, O_WRONLY|O_TRUNC|O_NONBLOCK, 0);
+	const int FIFO_Handle = open(FIFO_PATH_NAME, O_WRONLY | O_TRUNC | O_NONBLOCK, 0);
 	if (FIFO_Handle > 0)
 	{
 		if (write(FIFO_Handle, Message.c_str(), Message.length() + 1U) > 0)
@@ -514,12 +518,13 @@ bool FlushDNSFIFOSender(
 #endif
 
 //Flush DNS cache
-void FlushDNSCache(
+void Flush_DNS_Cache(
 	const uint8_t * const Domain)
 {
 //Flush DNS cache in process.
 	std::unique_lock<std::mutex> DNSCacheListMutex(DNSCacheListLock);
-	if (Domain == nullptr) //Flush all DNS cache.
+	if (Domain == nullptr || //Flush all DNS cache.
+		strnlen_s((const char *)Domain, DOMAIN_MAXSIZE) > DOMAIN_MINSIZE)
 	{
 		DNSCacheList.clear();
 	}
@@ -534,11 +539,13 @@ void FlushDNSCache(
 	}
 	DNSCacheListMutex.unlock();
 
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //Flush system DNS interval time check
 	if (LastFlushDNSTime > 0 && LastFlushDNSTime < GetCurrentSystemTime() + FLUSH_DNS_CACHE_INTERVAL_TIME * SECOND_TO_MILLISECOND)
 		return;
 	else 
 		LastFlushDNSTime = GetCurrentSystemTime();
+#endif
 
 //Flush DNS cache in system.
 	std::lock_guard<std::mutex> ScreenMutex(ScreenLock);
@@ -554,7 +561,7 @@ void FlushDNSCache(
 		Result = system("rndc restart 2>/dev/null"); //Name server control utility of BIND(9.1.3 and older version)
 		Result = system("rndc flush 2>/dev/null"); //Name server control utility of BIND(9.2.0 and newer version)
 	#endif
-#elif defined(PLATFORM_MACX)
+#elif defined(PLATFORM_MACOS)
 //	system("lookupd -flushcache 2>/dev/null"); //Less than Mac OS X Tiger(10.4)
 //	system("dscacheutil -flushcache 2>/dev/null"); //Mac OS X Leopard(10.5) and Snow Leopard(10.6)
 	system("killall -HUP mDNSResponder 2>/dev/null"); //Mac OS X Lion(10.7), Mountain Lion(10.8) and Mavericks(10.9)

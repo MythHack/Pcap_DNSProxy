@@ -17,32 +17,27 @@
 // Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
+#ifndef PCAP_DNSPROXY_MAIN_H
+#define PCAP_DNSPROXY_MAIN_H
+
 #include "Base.h"
 
 //Global variables
-extern CONFIGURATION_TABLE Parameter, ParameterModificating;
 extern GLOBAL_STATUS GlobalRunningStatus;
-#if defined(ENABLE_LIBSODIUM)
-extern DNSCURVE_CONFIGURATION_TABLE DNSCurveParameter, DNSCurveParameterModificating;
-#endif
 extern std::mutex ScreenLock;
 
-//Functions
+//Functions in ReadCommand.cpp
 #if defined(PLATFORM_WIN)
-bool ReadCommands(
+bool ReadCommand(
 	int argc, 
 	wchar_t *argv[]);
 bool FileNameInit(
 	const wchar_t * const OriginalPath);
-bool FirewallTest(
-	const uint16_t Protocol, 
-	ssize_t &ErrorCode);
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-bool ReadCommands(
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+bool ReadCommand(
 	int argc, 
 	char *argv[]);
 bool FileNameInit(
 	const char * const OriginalPath);
 #endif
-void MonitorLauncher(
-	void);
+#endif

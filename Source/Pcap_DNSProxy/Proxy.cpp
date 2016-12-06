@@ -149,7 +149,7 @@ size_t SOCKS_TCP_Request(
 	ErrorCodeList.front() = 0;
 
 //Socket initialization
-	if (Parameter.SOCKS_Address_IPv6.Storage.ss_family > 0 && //IPv6
+	if (Parameter.SOCKS_Address_IPv6.Storage.ss_family != 0 && //IPv6
 		((Parameter.SOCKS_Protocol_Network == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv6) || //Auto select
 		Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV6 || //IPv6
 		(Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV4 && Parameter.SOCKS_Address_IPv4.Storage.ss_family == 0))) //Non-IPv4
@@ -160,7 +160,7 @@ size_t SOCKS_TCP_Request(
 		SocketDataList.front().AddrLen = sizeof(sockaddr_in6);
 		SocketDataList.front().Socket = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
 	}
-	else if (Parameter.SOCKS_Address_IPv4.Storage.ss_family > 0 && //IPv4
+	else if (Parameter.SOCKS_Address_IPv4.Storage.ss_family != 0 && //IPv4
 		((Parameter.SOCKS_Protocol_Network == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv4) || //Auto select
 		Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV4 || //IPv4
 		(Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV6 && Parameter.SOCKS_Address_IPv6.Storage.ss_family == 0))) //Non-IPv6
@@ -194,27 +194,27 @@ size_t SOCKS_TCP_Request(
 	}
 
 //Selection exchange process
-	if (Parameter.SOCKS_Version == SOCKS_VERSION_5 && !SOCKS_Selection_Exchange(SocketDataList, SocketSelectingDataList, ErrorCodeList))
+	if (Parameter.SOCKS_Version == SOCKS_VERSION_5 && !SOCKS_SelectionExchange(SocketDataList, SocketSelectingDataList, ErrorCodeList))
 	{
 		SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
 		return EXIT_FAILURE;
 	}
 
 //Client command request process
-	if (!SOCKS_Client_Command_Request(IPPROTO_TCP, SocketDataList, SocketSelectingDataList, ErrorCodeList, nullptr))
+	if (!SOCKS_ClientCommandRequest(IPPROTO_TCP, SocketDataList, SocketSelectingDataList, ErrorCodeList, nullptr))
 	{
 		SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
 		return EXIT_FAILURE;
 	}
 
 //Add length of request packet(It must be written in header when transport with TCP protocol).
-	if (SocketSelectingDataList.front().SendSize < SendSize + sizeof(uint16_t))
+	if (SocketSelectingDataList.front().SendSize < SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES)
 	{
-		std::shared_ptr<uint8_t> SendBuffer(new uint8_t[SendSize + sizeof(uint16_t)]());
-		memset(SendBuffer.get(), 0, SendSize + sizeof(uint16_t));
-		memcpy_s(SendBuffer.get(), SendSize + sizeof(uint16_t), OriginalSend, SendSize);
+		std::shared_ptr<uint8_t> SendBuffer(new uint8_t[SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES]());
+		memset(SendBuffer.get(), 0, SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES);
+		memcpy_s(SendBuffer.get(), SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES, OriginalSend, SendSize);
 		SocketSelectingDataList.front().SendBuffer.swap(SendBuffer);
-		SocketSelectingDataList.front().SendSize = SendSize + sizeof(uint16_t);
+		SocketSelectingDataList.front().SendSize = SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES;
 		SocketSelectingDataList.front().SendLen = SendSize;
 	}
 	auto RecvLen = AddLengthDataToHeader(SocketSelectingDataList.front().SendBuffer.get(), SocketSelectingDataList.front().SendLen, SocketSelectingDataList.front().SendSize);
@@ -255,7 +255,7 @@ size_t SOCKS_TCP_Request(
 			return EXIT_FAILURE;
 
 	//Mark DNS cache.
-		if (Parameter.CacheType > CACHE_TYPE_NONE)
+		if (Parameter.CacheType != CACHE_TYPE_NONE)
 			MarkDomainCache(SocketSelectingDataList.front().RecvBuffer.get(), RecvLen);
 
 	//Swap buffer.
@@ -289,7 +289,7 @@ size_t SOCKS_UDP_Request(
 	LocalErrorCodeList.front() = 0;
 
 //Socket initialization
-	if (Parameter.SOCKS_Address_IPv6.Storage.ss_family > 0 && //IPv6
+	if (Parameter.SOCKS_Address_IPv6.Storage.ss_family != 0 && //IPv6
 		((Parameter.SOCKS_Protocol_Network == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv6) || //Auto select
 		Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV6 || //IPv6
 		(Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV4 && Parameter.SOCKS_Address_IPv4.Storage.ss_family == 0))) //Non-IPv4
@@ -316,7 +316,7 @@ size_t SOCKS_UDP_Request(
 		UDPSocketDataList.front().AddrLen = sizeof(sockaddr_in6);
 		UDPSocketDataList.front().Socket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 	}
-	else if (Parameter.SOCKS_Address_IPv4.Storage.ss_family > 0 && //IPv4
+	else if (Parameter.SOCKS_Address_IPv4.Storage.ss_family != 0 && //IPv4
 		((Parameter.SOCKS_Protocol_Network == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv4) || //Auto select
 		Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV4 || //IPv4
 		(Parameter.SOCKS_Protocol_Network == REQUEST_MODE_IPV6 && Parameter.SOCKS_Address_IPv6.Storage.ss_family == 0))) //Non-IPv6
@@ -348,7 +348,7 @@ size_t SOCKS_UDP_Request(
 	}
 
 //Socket attribute settings
-	if ((!Parameter.SOCKS_UDP_NoHandshake && !SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_INVALID_CHECK, true, nullptr)) || 
+	if (!(Parameter.SOCKS_UDP_NoHandshake || SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_INVALID_CHECK, true, nullptr)) || 
 		!SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_TCP_FAST_OPEN, true, nullptr) || 
 		(TCPSocketDataList.front().SockAddr.ss_family == AF_INET6 && !SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_HOP_LIMITS_IPV6, true, nullptr)) || 
 		(TCPSocketDataList.front().SockAddr.ss_family == AF_INET && !SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_HOP_LIMITS_IPV4, true, nullptr)) || 
@@ -366,7 +366,7 @@ size_t SOCKS_UDP_Request(
 	}
 	
 //Socket attribute setting(Non-blocking mode)
-	if ((!Parameter.SOCKS_UDP_NoHandshake && !SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_NON_BLOCKING_MODE, true, nullptr)) || 
+	if (!(Parameter.SOCKS_UDP_NoHandshake || SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_NON_BLOCKING_MODE, true, nullptr)) || 
 		!SocketSetting(UDPSocketDataList.front().Socket, SOCKET_SETTING_NON_BLOCKING_MODE, true, nullptr))
 	{
 		SocketSetting(UDPSocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
@@ -380,7 +380,7 @@ size_t SOCKS_UDP_Request(
 	if (!Parameter.SOCKS_UDP_NoHandshake)
 	{
 	//Selection exchange process
-		if (!SOCKS_Selection_Exchange(TCPSocketDataList, TCPSocketSelectingDataList, TCPErrorCodeList))
+		if (!SOCKS_SelectionExchange(TCPSocketDataList, TCPSocketSelectingDataList, TCPErrorCodeList))
 		{
 			SocketSetting(UDPSocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
 			SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
@@ -401,7 +401,7 @@ size_t SOCKS_UDP_Request(
 
 	//Client command request process
 	//IPPROTO_UDP means UDP ASSOCIATE process, this part must transport with TCP protocol.
-		if (!SOCKS_Client_Command_Request(IPPROTO_UDP, TCPSocketDataList, TCPSocketSelectingDataList, TCPErrorCodeList, &LocalSocketDataList.front()))
+		if (!SOCKS_ClientCommandRequest(IPPROTO_UDP, TCPSocketDataList, TCPSocketSelectingDataList, TCPErrorCodeList, &LocalSocketDataList.front()))
 		{
 			SocketSetting(UDPSocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
 			SocketSetting(TCPSocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
@@ -577,7 +577,7 @@ size_t SOCKS_UDP_Request(
 			return EXIT_FAILURE;
 
 	//Mark DNS cache.
-		if (Parameter.CacheType > CACHE_TYPE_NONE)
+		if (Parameter.CacheType != CACHE_TYPE_NONE)
 			MarkDomainCache(UDPSocketSelectingDataList.front().RecvBuffer.get(), RecvLen);
 
 	//Swap buffer.
@@ -590,11 +590,15 @@ size_t SOCKS_UDP_Request(
 }
 
 //SOCKS selection exchange process
-bool SOCKS_Selection_Exchange(
+bool SOCKS_SelectionExchange(
 	std::vector<SOCKET_DATA> &SocketDataList, 
 	std::vector<SOCKET_SELECTING_SERIAL_DATA> &SocketSelectingDataList, 
 	std::vector<ssize_t> &ErrorCodeList)
 {
+//Socket data check
+	if (SocketDataList.empty() || SocketSelectingDataList.empty() || ErrorCodeList.empty())
+		return false;
+
 //Buffer initialization
 	if (SocketSelectingDataList.front().SendSize < sizeof(socks_client_selection))
 	{
@@ -670,7 +674,7 @@ bool SOCKS_Selection_Exchange(
 				if (Parameter.SOCKS_Username != nullptr && !Parameter.SOCKS_Username->empty() && 
 					Parameter.SOCKS_Password != nullptr && !Parameter.SOCKS_Password->empty())
 				{
-					if (!SOCKS_Authentication_Exchange(SocketDataList, SocketSelectingDataList, ErrorCodeList))
+					if (!SOCKS_AuthenticationExchange(SocketDataList, SocketSelectingDataList, ErrorCodeList))
 					{
 						PrintError(LOG_LEVEL_3, LOG_ERROR_SOCKS, L"Username or Password incorrect", 0, nullptr, 0);
 						return false;
@@ -694,11 +698,15 @@ bool SOCKS_Selection_Exchange(
 }
 
 //SOCKS username/password authentication process
-bool SOCKS_Authentication_Exchange(
+bool SOCKS_AuthenticationExchange(
 	std::vector<SOCKET_DATA> &SocketDataList, 
 	std::vector<SOCKET_SELECTING_SERIAL_DATA> &SocketSelectingDataList, 
 	std::vector<ssize_t> &ErrorCodeList)
 {
+//Socket data check
+	if (SocketDataList.empty() || SocketSelectingDataList.empty() || ErrorCodeList.empty())
+		return false;
+
 //Buffer initialization
 	if (SocketSelectingDataList.front().SendSize < sizeof(socks_client_user_authentication) + sizeof(uint8_t) * 2U + Parameter.SOCKS_Username->length() + Parameter.SOCKS_Password->length())
 	{
@@ -739,13 +747,17 @@ bool SOCKS_Authentication_Exchange(
 }
 
 //SOCKS client command request process
-bool SOCKS_Client_Command_Request(
+bool SOCKS_ClientCommandRequest(
 	const uint16_t Protocol, 
 	std::vector<SOCKET_DATA> &SocketDataList, 
 	std::vector<SOCKET_SELECTING_SERIAL_DATA> &SocketSelectingDataList, 
 	std::vector<ssize_t> &ErrorCodeList, 
 	SOCKET_DATA * const UDP_ASSOCIATE_Address)
 {
+//Socket data check
+	if (SocketDataList.empty() || SocketSelectingDataList.empty() || ErrorCodeList.empty())
+		return false;
+
 //Buffer initialization
 	if (SocketSelectingDataList.front().SendSize < Parameter.LargeBufferSize)
 	{
@@ -982,15 +994,15 @@ size_t HTTP_CONNECT_Request(
 //TLS initialization
 	void *TLS_Context = nullptr;
 #if defined(ENABLE_TLS)
-#if defined(PLATFORM_WIN)
-	SSPI_HANDLE_TABLE SSPI_Handle;
-	if (Parameter.HTTP_CONNECT_TLS_Handshake)
-		TLS_Context = &SSPI_Handle;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-	OPENSSL_CONTEXT_TABLE OpenSSL_CTX;
-	if (Parameter.HTTP_CONNECT_TLS_Handshake)
-		TLS_Context = &OpenSSL_CTX;
-#endif
+	#if defined(PLATFORM_WIN)
+		SSPI_HANDLE_TABLE SSPI_Handle;
+		if (Parameter.HTTP_CONNECT_TLS_Handshake)
+			TLS_Context = &SSPI_Handle;
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		OPENSSL_CONTEXT_TABLE OpenSSL_CTX;
+		if (Parameter.HTTP_CONNECT_TLS_Handshake)
+			TLS_Context = &OpenSSL_CTX;
+	#endif
 #endif
 
 //HTTP CONNECT handshake
@@ -998,13 +1010,13 @@ size_t HTTP_CONNECT_Request(
 		return EXIT_FAILURE;
 
 //Buffer initialization
-	if (SocketSelectingDataList.front().SendSize < SendSize + sizeof(uint16_t))
+	if (SocketSelectingDataList.front().SendSize < SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES)
 	{
-		std::shared_ptr<uint8_t> SendBuffer(new uint8_t[SendSize + sizeof(uint16_t)]());
-		memset(SendBuffer.get(), 0, SendSize + sizeof(uint16_t));
-		memcpy_s(SendBuffer.get(), SendSize + sizeof(uint16_t), OriginalSend, SendSize);
+		std::shared_ptr<uint8_t> SendBuffer(new uint8_t[SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES]());
+		memset(SendBuffer.get(), 0, SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES);
+		memcpy_s(SendBuffer.get(), SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES, OriginalSend, SendSize);
 		SocketSelectingDataList.front().SendBuffer.swap(SendBuffer);
-		SocketSelectingDataList.front().SendSize = SendSize + sizeof(uint16_t);
+		SocketSelectingDataList.front().SendSize = SendSize + sizeof(uint16_t) + PADDING_RESERVED_BYTES;
 		SocketSelectingDataList.front().SendLen = SendSize;
 	}
 
@@ -1016,7 +1028,7 @@ size_t HTTP_CONNECT_Request(
 		if (TLS_Context != nullptr)
 	#if defined(PLATFORM_WIN)
 			SSPI_ShutdownConnection(*(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, ErrorCodeList);
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 			OpenSSL_ShutdownConnection(*(OPENSSL_CONTEXT_TABLE *)TLS_Context);
 		else 
 	#endif
@@ -1034,7 +1046,7 @@ size_t HTTP_CONNECT_Request(
 	if (RecvLen >= DNS_PACKET_MINSIZE)
 	{
 	//Mark DNS cache.
-		if (Parameter.CacheType > CACHE_TYPE_NONE)
+		if (Parameter.CacheType != CACHE_TYPE_NONE)
 			MarkDomainCache(SocketSelectingDataList.front().RecvBuffer.get(), RecvLen);
 
 	//Swap buffer.
@@ -1056,23 +1068,27 @@ bool HTTP_CONNECT_Handshake(
 	std::vector<ssize_t> &ErrorCodeList, 
 	void *TLS_Context)
 {
+//Socket data check
+	if (SocketDataList.empty() || SocketSelectingDataList.empty() || ErrorCodeList.empty())
+		return false;
+
 //Socket initialization
-	if (Parameter.HTTP_CONNECT_Address_IPv6.Storage.ss_family > 0 && //IPv6
+	if (Parameter.HTTP_CONNECT_Address_IPv6.Storage.ss_family != 0 && //IPv6
 		((Parameter.HTTP_CONNECT_Protocol == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv6) || //Auto select
 		Parameter.HTTP_CONNECT_Protocol == REQUEST_MODE_IPV6 || //IPv6
 		(Parameter.HTTP_CONNECT_Protocol == REQUEST_MODE_IPV4 && Parameter.HTTP_CONNECT_Address_IPv4.Storage.ss_family == 0))) //Non-IPv4
 	{
 	#if defined(ENABLE_TLS)
-	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		if (TLS_Context != nullptr)
-		{
-			if (Parameter.HTTP_CONNECT_TLS_AddressString_IPv6 != nullptr && !Parameter.HTTP_CONNECT_TLS_AddressString_IPv6->empty())
-				((OPENSSL_CONTEXT_TABLE *)TLS_Context)->AddressString = *Parameter.HTTP_CONNECT_TLS_AddressString_IPv6;
-			else 
-				return false;
-		}
-		else {
-	#endif
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (TLS_Context != nullptr)
+			{
+				if (Parameter.HTTP_CONNECT_TLS_AddressString_IPv6 != nullptr && !Parameter.HTTP_CONNECT_TLS_AddressString_IPv6->empty())
+					((OPENSSL_CONTEXT_TABLE *)TLS_Context)->AddressString = *Parameter.HTTP_CONNECT_TLS_AddressString_IPv6;
+				else 
+					return false;
+			}
+			else {
+		#endif
 	#endif
 			SocketDataList.front().SockAddr.ss_family = AF_INET6;
 			((PSOCKADDR_IN6)&SocketDataList.front().SockAddr)->sin6_addr = Parameter.HTTP_CONNECT_Address_IPv6.IPv6.sin6_addr;
@@ -1080,27 +1096,27 @@ bool HTTP_CONNECT_Handshake(
 			SocketDataList.front().AddrLen = sizeof(sockaddr_in6);
 			SocketDataList.front().Socket = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
 	#if defined(ENABLE_TLS)
-	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		}
-	#endif
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			}
+		#endif
 	#endif
 	}
-	else if (Parameter.HTTP_CONNECT_Address_IPv4.Storage.ss_family > 0 && //IPv4
+	else if (Parameter.HTTP_CONNECT_Address_IPv4.Storage.ss_family != 0 && //IPv4
 		((Parameter.HTTP_CONNECT_Protocol == REQUEST_MODE_BOTH && GlobalRunningStatus.GatewayAvailable_IPv4) || //Auto select
 		Parameter.HTTP_CONNECT_Protocol == REQUEST_MODE_IPV4 || //IPv4
 		(Parameter.HTTP_CONNECT_Protocol == REQUEST_MODE_IPV6 && Parameter.HTTP_CONNECT_Address_IPv6.Storage.ss_family == 0))) //Non-IPv6
 	{
 	#if defined(ENABLE_TLS)
-	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		if (TLS_Context != nullptr)
-		{
-			if (Parameter.HTTP_CONNECT_TLS_AddressString_IPv4 != nullptr && !Parameter.HTTP_CONNECT_TLS_AddressString_IPv4->empty())
-				((OPENSSL_CONTEXT_TABLE *)TLS_Context)->AddressString = *Parameter.HTTP_CONNECT_TLS_AddressString_IPv4;
-			else 
-				return false;
-		}
-		else {
-	#endif
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (TLS_Context != nullptr)
+			{
+				if (Parameter.HTTP_CONNECT_TLS_AddressString_IPv4 != nullptr && !Parameter.HTTP_CONNECT_TLS_AddressString_IPv4->empty())
+					((OPENSSL_CONTEXT_TABLE *)TLS_Context)->AddressString = *Parameter.HTTP_CONNECT_TLS_AddressString_IPv4;
+				else 
+					return false;
+			}
+			else {
+		#endif
 	#endif
 			SocketDataList.front().SockAddr.ss_family = AF_INET;
 			((PSOCKADDR_IN)&SocketDataList.front().SockAddr)->sin_addr = Parameter.HTTP_CONNECT_Address_IPv4.IPv4.sin_addr;
@@ -1108,9 +1124,9 @@ bool HTTP_CONNECT_Handshake(
 			SocketDataList.front().AddrLen = sizeof(sockaddr_in);
 			SocketDataList.front().Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	#if defined(ENABLE_TLS)
-	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		}
-	#endif
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			}
+		#endif
 	#endif
 	}
 	else {
@@ -1119,10 +1135,10 @@ bool HTTP_CONNECT_Handshake(
 
 //Socket attribute settings
 #if defined(ENABLE_TLS)
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-	if (TLS_Context == nullptr)
-	{
-#endif
+	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		if (TLS_Context == nullptr)
+		{
+	#endif
 #endif
 	//Socket check
 		if (!SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_INVALID_CHECK, false, nullptr))
@@ -1149,9 +1165,9 @@ bool HTTP_CONNECT_Handshake(
 		}
 
 #if defined(ENABLE_TLS)
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-	}
-#endif
+	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		}
+	#endif
 #endif
 
 //TLS handshake
@@ -1171,7 +1187,7 @@ bool HTTP_CONNECT_Handshake(
 
 			return false;
 		}
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		if (!OpenSSL_CTX_Initializtion(*(OPENSSL_CONTEXT_TABLE *)TLS_Context) || !OpenSSL_BIO_Initializtion(*(OPENSSL_CONTEXT_TABLE *)TLS_Context))
 		{
 			return false;
@@ -1193,7 +1209,7 @@ bool HTTP_CONNECT_Handshake(
 		if (TLS_Context != nullptr)
 	#if defined(PLATFORM_WIN)
 			SSPI_ShutdownConnection(*(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, ErrorCodeList);
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 			OpenSSL_ShutdownConnection(*(OPENSSL_CONTEXT_TABLE *)TLS_Context);
 		else 
 	#endif
@@ -1213,6 +1229,10 @@ bool HTTP_CONNECT_Exchange(
 	std::vector<ssize_t> &ErrorCodeList, 
 	void *TLS_Context)
 {
+//Socket data check
+	if (SocketDataList.empty() || SocketSelectingDataList.empty() || ErrorCodeList.empty())
+		return false;
+
 //HTTP CONNECT packet
 	std::string HTTPString("CONNECT ");
 	HTTPString.append(*Parameter.HTTP_CONNECT_TargetDomain);
@@ -1244,7 +1264,7 @@ bool HTTP_CONNECT_Exchange(
 	#if defined(ENABLE_TLS)
 	#if defined(PLATFORM_WIN)
 		if (!TLS_TransportSerial(HTTP_RESPONSE_MINSIZE, *(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, SocketSelectingDataList, ErrorCodeList))
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		if (!TLS_TransportSerial(REQUEST_PROCESS_HTTP_CONNECT, HTTP_RESPONSE_MINSIZE, *(OPENSSL_CONTEXT_TABLE *)TLS_Context, SocketSelectingDataList))
 	#endif
 			return false;
@@ -1307,7 +1327,7 @@ bool HTTP_CONNECT_Exchange(
 		else 
 			HTTPString.erase(HTTPString.find("\r\n\r\n"), HTTPString.length() - HTTPString.find("\r\n"));
 		std::wstring Message;
-		if (!MBSToWCSString((const uint8_t *)HTTPString.c_str(), HTTPString.length(), Message))
+		if (!MBS_To_WCS_String((const uint8_t *)HTTPString.c_str(), HTTPString.length(), Message))
 			PrintError(LOG_LEVEL_2, LOG_ERROR_SYSTEM, L"Convert multiple byte or wide char string error", 0, nullptr, 0);
 		else 
 			PrintError(LOG_LEVEL_3, LOG_ERROR_HTTP_CONNECT, Message.c_str(), 0, nullptr, 0);
@@ -1326,34 +1346,39 @@ size_t HTTP_CONNECT_Transport(
 	std::vector<ssize_t> &ErrorCodeList, 
 	void *TLS_Context)
 {
+//Socket data check
+	if (SocketDataList.empty() || SocketSelectingDataList.empty() || ErrorCodeList.empty())
+		return false;
+
+//Initialization
 	size_t RecvLen = 0;
 
 //Request exchange
 	if (TLS_Context != nullptr)
 	{
 	#if defined(ENABLE_TLS)
-	#if defined(PLATFORM_WIN)
-		if (!TLS_TransportSerial(DNS_PACKET_MINSIZE, *(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, SocketSelectingDataList, ErrorCodeList))
-		{
-			SSPI_ShutdownConnection(*(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, ErrorCodeList);
-			SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
+		#if defined(PLATFORM_WIN)
+			if (!TLS_TransportSerial(DNS_PACKET_MINSIZE, *(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, SocketSelectingDataList, ErrorCodeList))
+			{
+				SSPI_ShutdownConnection(*(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, ErrorCodeList);
+				SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
 
-			return EXIT_FAILURE;
-		}
-		else {
-			SSPI_ShutdownConnection(*(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, ErrorCodeList);
-			SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
-		}
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		if (!TLS_TransportSerial(REQUEST_PROCESS_TCP, DNS_PACKET_MINSIZE, *(OPENSSL_CONTEXT_TABLE *)TLS_Context, SocketSelectingDataList))
-		{
-			OpenSSL_ShutdownConnection(*(OPENSSL_CONTEXT_TABLE *)TLS_Context);
-			return EXIT_FAILURE;
-		}
-		else {
-			OpenSSL_ShutdownConnection(*(OPENSSL_CONTEXT_TABLE *)TLS_Context);
-		}
-	#endif
+				return EXIT_FAILURE;
+			}
+			else {
+				SSPI_ShutdownConnection(*(SSPI_HANDLE_TABLE *)TLS_Context, SocketDataList, ErrorCodeList);
+				SocketSetting(SocketDataList.front().Socket, SOCKET_SETTING_CLOSE, false, nullptr);
+			}
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (!TLS_TransportSerial(REQUEST_PROCESS_TCP, DNS_PACKET_MINSIZE, *(OPENSSL_CONTEXT_TABLE *)TLS_Context, SocketSelectingDataList))
+			{
+				OpenSSL_ShutdownConnection(*(OPENSSL_CONTEXT_TABLE *)TLS_Context);
+				return EXIT_FAILURE;
+			}
+			else {
+				OpenSSL_ShutdownConnection(*(OPENSSL_CONTEXT_TABLE *)TLS_Context);
+			}
+		#endif
 	#endif
 	}
 	else {

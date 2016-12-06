@@ -19,6 +19,133 @@
 
 #include "Monitor.h"
 
+//Monitor launcher process
+void MonitorLauncher(
+	void)
+{
+//Network monitor(Mark Local DNS address to PTR Records)
+	ParameterModificating.SetToMonitorItem();
+	std::thread NetworkInformationMonitorThread(std::bind(NetworkInformationMonitor));
+	NetworkInformationMonitorThread.detach();
+
+//DNSCurve initialization(Encryption mode)
+#if defined(ENABLE_LIBSODIUM)
+	if (Parameter.IsDNSCurve)
+	{
+		DNSCurveParameterModificating.SetToMonitorItem();
+		if (DNSCurveParameter.IsEncryption)
+			DNSCurveInit();
+	}
+#endif
+
+//Read parameter(Monitor mode)
+	if (!GlobalRunningStatus.FileList_IPFilter->empty())
+	{
+		std::thread ReadParameterThread(std::bind(ReadParameter, false));
+		ReadParameterThread.detach();
+	}
+
+//Read Hosts monitor
+	if (!GlobalRunningStatus.FileList_Hosts->empty())
+	{
+		std::thread ReadHostsThread(std::bind(ReadHosts));
+		ReadHostsThread.detach();
+	}
+
+//Read IPFilter monitor
+	if (Parameter.OperationMode == LISTEN_MODE_CUSTOM || Parameter.DataCheck_Blacklist || Parameter.LocalRouting)
+	{
+		std::thread ReadIPFilterThread(std::bind(ReadIPFilter));
+		ReadIPFilterThread.detach();
+	}
+
+//Capture monitor
+#if defined(ENABLE_PCAP)
+	if (Parameter.IsPcapCapture && 
+	//Direct Request mode
+		!(Parameter.DirectRequest == REQUEST_MODE_DIRECT_BOTH || 
+		(Parameter.DirectRequest == REQUEST_MODE_DIRECT_IPV6 && Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0 && 
+		Parameter.DirectRequest == REQUEST_MODE_DIRECT_IPV4 && Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0)) && 
+	//SOCKS request only mode
+		!(Parameter.SOCKS_Proxy && Parameter.SOCKS_Only) && 
+	//HTTP CONNECT request only mode
+		!(Parameter.HTTP_CONNECT_Proxy && Parameter.HTTP_CONNECT_Only)
+	//DNSCurve request only mode
+	#if defined(ENABLE_LIBSODIUM)
+		&& !(Parameter.IsDNSCurve && DNSCurveParameter.IsEncryptionOnly)
+	#endif
+		)
+	{
+	#if defined(ENABLE_PCAP)
+		std::thread CaptureInitializationThread(std::bind(CaptureInit));
+		CaptureInitializationThread.detach();
+	#endif
+
+	//Get Hop Limits/TTL with normal DNS request(IPv6).
+		if (Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
+			(Parameter.RequestMode_Network == REQUEST_MODE_BOTH || Parameter.RequestMode_Network == REQUEST_MODE_IPV6 || //IPv6
+			(Parameter.RequestMode_Network == REQUEST_MODE_IPV4 && Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0))) //Non-IPv4
+		{
+			std::thread IPv6TestDoaminThread(std::bind(DomainTestRequest, AF_INET6));
+			IPv6TestDoaminThread.detach();
+		}
+
+	//Get Hop Limits/TTL with normal DNS request(IPv4).
+		if (Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
+			(Parameter.RequestMode_Network == REQUEST_MODE_BOTH || Parameter.RequestMode_Network == REQUEST_MODE_IPV4 || //IPv4
+			(Parameter.RequestMode_Network == REQUEST_MODE_IPV6 && Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0))) //Non-IPv6
+		{
+			std::thread IPv4TestDoaminThread(std::bind(DomainTestRequest, AF_INET));
+			IPv4TestDoaminThread.detach();
+		}
+
+	//Get Hop Limits with ICMPv6 echo.
+		if (Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
+			(Parameter.RequestMode_Network == REQUEST_MODE_BOTH || Parameter.RequestMode_Network == REQUEST_MODE_IPV6 || //IPv6
+			(Parameter.RequestMode_Network == REQUEST_MODE_IPV4 && Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0))) //Non-IPv4
+		{
+			std::thread ICMPv6Thread(std::bind(ICMP_TestRequest, AF_INET6));
+			ICMPv6Thread.detach();
+		}
+
+	//Get TTL with ICMP echo.
+		if (Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
+			(Parameter.RequestMode_Network == REQUEST_MODE_BOTH || Parameter.RequestMode_Network == REQUEST_MODE_IPV4 || //IPv4
+			(Parameter.RequestMode_Network == REQUEST_MODE_IPV6 && Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0))) //Non-IPv6
+		{
+			std::thread ICMP_Thread(std::bind(ICMP_TestRequest, AF_INET));
+			ICMP_Thread.detach();
+		}
+	}
+#endif
+
+//Alternate server monitor(Set Preferred DNS servers switcher)
+	if ((!Parameter.AlternateMultipleRequest && 
+		(Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0 || 
+			Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0
+	#if defined(ENABLE_LIBSODIUM)
+		|| DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0
+		|| DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0
+	#endif
+		)) || Parameter.Target_Server_Local_Alternate_IPv6.Storage.ss_family != 0 || 
+		Parameter.Target_Server_Local_Alternate_IPv4.Storage.ss_family != 0)
+	{
+		std::thread AlternateServerMonitorThread(std::bind(AlternateServerMonitor));
+		AlternateServerMonitorThread.detach();
+	}
+
+//MailSlot and FIFO monitor
+#if defined(PLATFORM_WIN)
+	std::thread Flush_DNS_MailSlotMonitorThread(std::bind(Flush_DNS_MailSlotMonitor));
+	Flush_DNS_MailSlotMonitorThread.detach();
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	std::thread Flush_DNS_FIFO_MonitorThread(std::bind(Flush_DNS_FIFO_Monitor));
+	Flush_DNS_FIFO_MonitorThread.detach();
+#endif
+
+	return;
+}
+
 //Local DNS server initialization
 bool MonitorInit(
 	void)
@@ -65,10 +192,17 @@ bool MonitorInit(
 						((PSOCKADDR_IN6)&LocalSocketData.SockAddr)->sin6_port = ((PSOCKADDR_IN6)&ListenAddressIter)->sin6_port;
 
 					//Add to global list.
-						std::thread MonitorThreadTemp(std::bind(UDPMonitor, LocalSocketData, Result));
-						MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-						++MonitorThreadIndex;
-						LocalSocketData.Socket = 0;
+						if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+						{
+							std::thread MonitorThreadTemp(std::bind(UDP_Monitor, LocalSocketData, Result));
+							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+							++MonitorThreadIndex;
+							LocalSocketData.Socket = 0;
+						}
+						else {
+							MonitorThread.clear();
+							return false;
+						}
 					}
 				}
 				else {
@@ -100,10 +234,17 @@ bool MonitorInit(
 							((PSOCKADDR_IN6)&LocalSocketData.SockAddr)->sin6_port = ListenPortIter;
 
 						//Add to global list.
-							std::thread MonitorThreadTemp(std::bind(UDPMonitor, LocalSocketData, Result));
-							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-							++MonitorThreadIndex;
-							LocalSocketData.Socket = 0;
+							if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+							{
+								std::thread MonitorThreadTemp(std::bind(UDP_Monitor, LocalSocketData, Result));
+								MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+								++MonitorThreadIndex;
+								LocalSocketData.Socket = 0;
+							}
+							else {
+								MonitorThread.clear();
+								return false;
+							}
 						}
 					}
 				}
@@ -146,10 +287,17 @@ bool MonitorInit(
 						((PSOCKADDR_IN6)&LocalSocketData.SockAddr)->sin6_port = ((PSOCKADDR_IN6)&ListenAddressIter)->sin6_port;
 
 					//Add to global list.
-						std::thread MonitorThreadTemp(std::bind(TCPMonitor, LocalSocketData, Result));
-						MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-						++MonitorThreadIndex;
-						LocalSocketData.Socket = 0;
+						if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+						{
+							std::thread MonitorThreadTemp(std::bind(TCP_Monitor, LocalSocketData, Result));
+							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+							++MonitorThreadIndex;
+							LocalSocketData.Socket = 0;
+						}
+						else {
+							MonitorThread.clear();
+							return false;
+						}
 					}
 				}
 				else {
@@ -181,10 +329,17 @@ bool MonitorInit(
 							((PSOCKADDR_IN6)&LocalSocketData.SockAddr)->sin6_port = ListenPortIter;
 
 						//Add to global list.
-							std::thread MonitorThreadTemp(std::bind(TCPMonitor, LocalSocketData, Result));
-							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-							++MonitorThreadIndex;
-							LocalSocketData.Socket = 0;
+							if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+							{
+								std::thread MonitorThreadTemp(std::bind(TCP_Monitor, LocalSocketData, Result));
+								MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+								++MonitorThreadIndex;
+								LocalSocketData.Socket = 0;
+							}
+							else {
+								MonitorThread.clear();
+								return false;
+							}
 						}
 					}
 				}
@@ -230,10 +385,17 @@ bool MonitorInit(
 						((PSOCKADDR_IN)&LocalSocketData.SockAddr)->sin_port = ((PSOCKADDR_IN)&ListenAddressIter)->sin_port;
 
 					//Add to global list.
-						std::thread MonitorThreadTemp(std::bind(UDPMonitor, LocalSocketData, Result));
-						MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-						++MonitorThreadIndex;
-						LocalSocketData.Socket = 0;
+						if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+						{
+							std::thread MonitorThreadTemp(std::bind(UDP_Monitor, LocalSocketData, Result));
+							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+							++MonitorThreadIndex;
+							LocalSocketData.Socket = 0;
+						}
+						else {
+							MonitorThread.clear();
+							return false;
+						}
 					}
 				}
 				else {
@@ -265,10 +427,17 @@ bool MonitorInit(
 							((PSOCKADDR_IN)&LocalSocketData.SockAddr)->sin_port = ListenPortIter;
 
 						//Add to global list.
-							std::thread MonitorThreadTemp(std::bind(UDPMonitor, LocalSocketData, Result));
-							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-							++MonitorThreadIndex;
-							LocalSocketData.Socket = 0;
+							if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+							{
+								std::thread MonitorThreadTemp(std::bind(UDP_Monitor, LocalSocketData, Result));
+								MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+								++MonitorThreadIndex;
+								LocalSocketData.Socket = 0;
+							}
+							else {
+								MonitorThread.clear();
+								return false;
+							}
 						}
 					}
 				}
@@ -311,10 +480,17 @@ bool MonitorInit(
 						((PSOCKADDR_IN)&LocalSocketData.SockAddr)->sin_port = ((PSOCKADDR_IN)&ListenAddressIter)->sin_port;
 
 					//Add to global list.
-						std::thread MonitorThreadTemp(std::bind(TCPMonitor, LocalSocketData, Result));
-						MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
-						++MonitorThreadIndex;
-						LocalSocketData.Socket = 0;
+						if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+						{
+							std::thread MonitorThreadTemp(std::bind(TCP_Monitor, LocalSocketData, Result));
+							MonitorThread.at(MonitorThreadIndex).swap(MonitorThreadTemp);
+							++MonitorThreadIndex;
+							LocalSocketData.Socket = 0;
+						}
+						else {
+							MonitorThread.clear();
+							return false;
+						}
 					}
 				}
 				else {
@@ -348,10 +524,17 @@ bool MonitorInit(
 							((PSOCKADDR_IN)&LocalSocketData.SockAddr)->sin_port = ListenPortIter;
 
 						//Add to global list.
-							std::thread InnerMonitorThreadTemp(std::bind(TCPMonitor, LocalSocketData, Result));
-							MonitorThread.at(MonitorThreadIndex).swap(InnerMonitorThreadTemp);
-							++MonitorThreadIndex;
-							LocalSocketData.Socket = 0;
+							if (MonitorThreadIndex < (Parameter.ListenPort->size() + 1U) * TRANSPORT_LAYER_PARTNUM)
+							{
+								std::thread InnerMonitorThreadTemp(std::bind(TCP_Monitor, LocalSocketData, Result));
+								MonitorThread.at(MonitorThreadIndex).swap(InnerMonitorThreadTemp);
+								++MonitorThreadIndex;
+								LocalSocketData.Socket = 0;
+							}
+							else {
+								MonitorThread.clear();
+								return false;
+							}
 						}
 					}
 				}
@@ -367,7 +550,7 @@ bool MonitorInit(
 //Start monitor request consumer threads.
 	if (Parameter.ThreadPoolBaseNum > 0)
 	{
-		for (size_t Index = 0;Index < Parameter.ThreadPoolBaseNum;++Index)
+		for (MonitorThreadIndex = 0;MonitorThreadIndex < Parameter.ThreadPoolBaseNum;++MonitorThreadIndex)
 		{
 		//Start monitor consumer thread.
 			std::thread MonitorConsumerThread(std::bind(MonitorRequestConsumer));
@@ -376,6 +559,7 @@ bool MonitorInit(
 
 		*GlobalRunningStatus.ThreadRunningNum += Parameter.ThreadPoolBaseNum;
 		*GlobalRunningStatus.ThreadRunningFreeNum += Parameter.ThreadPoolBaseNum;
+		MonitorThreadIndex = 0;
 	}
 
 //Join threads.
@@ -395,7 +579,7 @@ bool MonitorInit(
 }
 
 //Local DNS server with UDP protocol
-bool UDPMonitor(
+bool UDP_Monitor(
 	const SOCKET_DATA LocalSocketData, 
 	bool * const Result)
 {
@@ -404,7 +588,7 @@ bool UDPMonitor(
 	#if defined(PLATFORM_WIN)
 		!SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_UDP_BLOCK_RESET, true, nullptr) || 
 		!SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_REUSE, true, nullptr) || 
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		(LocalSocketData.SockAddr.ss_family == AF_INET6 && !SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_REUSE, true, nullptr)) || 
 	#endif
 		!SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_NON_BLOCKING_MODE, true, nullptr))
@@ -462,7 +646,7 @@ bool UDPMonitor(
 	//Wait for system calling.
 	#if defined(PLATFORM_WIN)
 		SelectResult = select(0, &ReadFDS, nullptr, nullptr, nullptr);
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		SelectResult = select(MonitorQueryData.second.Socket + 1U, &ReadFDS, nullptr, nullptr, nullptr);
 	#endif
 		if (SelectResult > 0)
@@ -478,7 +662,8 @@ bool UDPMonitor(
 				else {
 					MonitorQueryData.first.Buffer = RecvBuffer.get() + PACKET_MAXSIZE * Index;
 					MonitorQueryData.first.Length = RecvLen;
-					MonitorQueryData.first.IsLocal = false;
+					MonitorQueryData.first.IsLocalRequest = false;
+					MonitorQueryData.first.IsLocalForce = false;
 					memset(&MonitorQueryData.first.LocalTarget, 0, sizeof(MonitorQueryData.first.LocalTarget));
 
 				//Check DNS query data.
@@ -521,7 +706,7 @@ bool UDPMonitor(
 }
 
 //Local DNS server with TCP protocol
-bool TCPMonitor(
+bool TCP_Monitor(
 	const SOCKET_DATA LocalSocketData, 
 	bool * const Result)
 {
@@ -529,7 +714,7 @@ bool TCPMonitor(
 	if (
 	#if defined(PLATFORM_WIN)
 		!SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_REUSE, true, nullptr) || 
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		(LocalSocketData.SockAddr.ss_family == AF_INET6 && !SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_REUSE, true, nullptr)) || 
 	#endif
 		!SocketSetting(LocalSocketData.Socket, SOCKET_SETTING_TCP_FAST_OPEN, true, nullptr) || 
@@ -595,7 +780,7 @@ bool TCPMonitor(
 	//Wait for system calling.
 	#if defined(PLATFORM_WIN)
 		SelectResult = select(0, &ReadFDS, nullptr, nullptr, nullptr);
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		SelectResult = select(LocalSocketData.Socket + 1U, &ReadFDS, nullptr, nullptr, nullptr);
 	#endif
 		if (SelectResult > 0)
@@ -622,8 +807,8 @@ bool TCPMonitor(
 					MonitorRequestProvider(MonitorQueryData);
 				}
 				else { //New thread mode
-					std::thread TCPReceiveThread(std::bind(TCPReceiveProcess, MonitorQueryData, nullptr, 0));
-					TCPReceiveThread.detach();
+					std::thread TCP_ReceiveThread(std::bind(TCP_ReceiveProcess, MonitorQueryData, nullptr, 0));
+					TCP_ReceiveThread.detach();
 				}
 
 				Index = (Index + 1U) % Parameter.ThreadPoolMaxNum;
@@ -651,7 +836,7 @@ bool TCPMonitor(
 }
 
 //TCP Monitor receive process
-bool TCPReceiveProcess(
+bool TCP_ReceiveProcess(
 	MONITOR_QUEUE_DATA MonitorQueryData, 
 	uint8_t * const OriginalRecv, 
 	size_t RecvSize)
@@ -669,7 +854,7 @@ bool TCPReceiveProcess(
 #if defined(PLATFORM_WIN)
 	Timeout.tv_sec = Parameter.SocketTimeout_Reliable_Once / SECOND_TO_MILLISECOND;
 	Timeout.tv_usec = Parameter.SocketTimeout_Reliable_Once % SECOND_TO_MILLISECOND * MICROSECOND_TO_MILLISECOND;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	Timeout.tv_sec = Parameter.SocketTimeout_Reliable_Once.tv_sec;
 	Timeout.tv_usec = Parameter.SocketTimeout_Reliable_Once.tv_usec;
 #endif
@@ -678,7 +863,7 @@ bool TCPReceiveProcess(
 
 #if defined(PLATFORM_WIN)
 	RecvLen = select(0, &ReadFDS, nullptr, nullptr, &Timeout);
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	RecvLen = select(MonitorQueryData.second.Socket + 1U, &ReadFDS, nullptr, nullptr, &Timeout);
 #endif
 	if (RecvLen > 0 && FD_ISSET(MonitorQueryData.second.Socket, &ReadFDS))
@@ -708,7 +893,7 @@ bool TCPReceiveProcess(
 	#if defined(PLATFORM_WIN)
 		Timeout.tv_sec = Parameter.SocketTimeout_Reliable_Once / SECOND_TO_MILLISECOND;
 		Timeout.tv_usec = Parameter.SocketTimeout_Reliable_Once % SECOND_TO_MILLISECOND * MICROSECOND_TO_MILLISECOND;
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		Timeout.tv_sec = Parameter.SocketTimeout_Reliable_Once.tv_sec;
 		Timeout.tv_usec = Parameter.SocketTimeout_Reliable_Once.tv_usec;
 	#endif
@@ -718,7 +903,7 @@ bool TCPReceiveProcess(
 	//Wait for system calling.
 	#if defined(PLATFORM_WIN)
 		RecvLen = select(0, &ReadFDS, nullptr, nullptr, &Timeout);
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		RecvLen = select(MonitorQueryData.second.Socket + 1U, &ReadFDS, nullptr, nullptr, &Timeout);
 	#endif
 		if (RecvLen > 0 && FD_ISSET(MonitorQueryData.second.Socket, &ReadFDS))
@@ -749,7 +934,8 @@ bool TCPReceiveProcess(
 	{
 		MonitorQueryData.first.Buffer = RecvBuffer.get() + sizeof(uint16_t);
 		MonitorQueryData.first.Length = Length;
-		MonitorQueryData.first.IsLocal = false;
+		MonitorQueryData.first.IsLocalRequest = false;
+		MonitorQueryData.first.IsLocalForce = false;
 		memset(&MonitorQueryData.first.LocalTarget, 0, sizeof(MonitorQueryData.first.LocalTarget));
 
 	//Check DNS query data.
@@ -773,7 +959,7 @@ bool TCPReceiveProcess(
 	shutdown(MonitorQueryData.second.Socket, SD_SEND);
 #if defined(PLATFORM_WIN)
 	Sleep(Parameter.SocketTimeout_Reliable_Once);
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	usleep(Parameter.SocketTimeout_Reliable_Once.tv_sec * SECOND_TO_MILLISECOND * MICROSECOND_TO_MILLISECOND + Parameter.SocketTimeout_Reliable_Once.tv_usec);
 #endif
 	SocketSetting(MonitorQueryData.second.Socket, SOCKET_SETTING_CLOSE, false, nullptr);
@@ -839,42 +1025,34 @@ addrinfo *GetLocalAddressList(
 	const uint16_t Protocol, 
 	uint8_t * const HostName)
 {
-//Initialization
-	addrinfo Hints;
-	memset(&Hints, 0, sizeof(Hints));
-	addrinfo *Result = nullptr;
-	if (Protocol == AF_INET6)
-		Hints.ai_family = AF_INET6;
-	else if (Protocol == AF_INET)
-		Hints.ai_family = AF_INET;
-	else 
-		return nullptr;
-	Hints.ai_socktype = SOCK_DGRAM;
-	Hints.ai_protocol = IPPROTO_UDP;
 	memset(HostName, 0, DOMAIN_MAXSIZE);
 
 //Get local machine name.
-	if (gethostname((char *)HostName, DOMAIN_MAXSIZE) == SOCKET_ERROR)
+	if (gethostname((char *)HostName, DOMAIN_MAXSIZE) == SOCKET_ERROR || CheckEmptyBuffer(HostName, DOMAIN_MAXSIZE))
 	{
 		PrintError(LOG_LEVEL_3, LOG_ERROR_NETWORK, L"Get local machine name error", WSAGetLastError(), nullptr, 0);
 		return nullptr;
 	}
 
+//Initialization
+	addrinfo Hints;
+	memset(&Hints, 0, sizeof(Hints));
+	addrinfo *Result = nullptr;
+	Hints.ai_family = Protocol;
+	Hints.ai_socktype = SOCK_DGRAM;
+	Hints.ai_protocol = IPPROTO_UDP;
+
 //Get local machine name data.
-	int InnerResult = getaddrinfo((char *)HostName, nullptr, &Hints, &Result);
-	if (InnerResult != 0)
+	auto InnerResult = getaddrinfo((char *)HostName, nullptr, &Hints, &Result);
+	if (InnerResult != 0 || Result == nullptr)
 	{
 		PrintError(LOG_LEVEL_3, LOG_ERROR_NETWORK, L"Get local machine address error", InnerResult, nullptr, 0);
-
-		freeaddrinfo(Result);
 		return nullptr;
 	}
 
 	return Result;
 }
-#endif
-
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //Get address from best network interface
 bool GetBestInterfaceAddress(
 	const uint16_t Protocol, 
@@ -895,7 +1073,7 @@ bool GetBestInterfaceAddress(
 			GlobalRunningStatus.GatewayAvailable_IPv6 = false;
 		else if (Protocol == AF_INET)
 			GlobalRunningStatus.GatewayAvailable_IPv4 = false;
-
+		
 		return false;
 	}
 
@@ -908,8 +1086,9 @@ bool GetBestInterfaceAddress(
 
 	//UDP connecting
 		if (connect(InterfaceSocket, (PSOCKADDR)&SockAddr, sizeof(sockaddr_in6)) == SOCKET_ERROR || 
-			getsockname(InterfaceSocket, (PSOCKADDR)&SockAddr, &AddrLen) == SOCKET_ERROR || SockAddr.ss_family != AF_INET6 || 
-			AddrLen != sizeof(sockaddr_in6) || CheckEmptyBuffer(&((PSOCKADDR_IN6)&SockAddr)->sin6_addr, sizeof(((PSOCKADDR_IN6)&SockAddr)->sin6_addr)))
+			getsockname(InterfaceSocket, (PSOCKADDR)&SockAddr, &AddrLen) == SOCKET_ERROR || 
+			SockAddr.ss_family != AF_INET6 || AddrLen != sizeof(sockaddr_in6) || 
+			CheckEmptyBuffer(&((PSOCKADDR_IN6)&SockAddr)->sin6_addr, sizeof(((PSOCKADDR_IN6)&SockAddr)->sin6_addr)))
 		{
 			SocketSetting(InterfaceSocket, SOCKET_SETTING_CLOSE, false, nullptr);
 			GlobalRunningStatus.GatewayAvailable_IPv6 = false;
@@ -925,8 +1104,9 @@ bool GetBestInterfaceAddress(
 
 	//UDP connecting
 		if (connect(InterfaceSocket, (PSOCKADDR)&SockAddr, sizeof(sockaddr_in)) == SOCKET_ERROR || 
-			getsockname(InterfaceSocket, (PSOCKADDR)&SockAddr, &AddrLen) == SOCKET_ERROR || SockAddr.ss_family != AF_INET || 
-			AddrLen != sizeof(sockaddr_in) || CheckEmptyBuffer(&((PSOCKADDR_IN)&SockAddr)->sin_addr, sizeof(((PSOCKADDR_IN)&SockAddr)->sin_addr)))
+			getsockname(InterfaceSocket, (PSOCKADDR)&SockAddr, &AddrLen) == SOCKET_ERROR || 
+			SockAddr.ss_family != AF_INET || AddrLen != sizeof(sockaddr_in) || 
+			CheckEmptyBuffer(&((PSOCKADDR_IN)&SockAddr)->sin_addr, sizeof(((PSOCKADDR_IN)&SockAddr)->sin_addr)))
 		{
 			SocketSetting(InterfaceSocket, SOCKET_SETTING_CLOSE, false, nullptr);
 			GlobalRunningStatus.GatewayAvailable_IPv4 = false;
@@ -950,10 +1130,13 @@ void GetGatewayInformation(
 {
 	if (Protocol == AF_INET6)
 	{
-		if (Parameter.Target_Server_IPv6.AddressData.Storage.ss_family == 0 && Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family == 0 && 
-			Parameter.Target_Server_Local_IPv6.Storage.ss_family == 0 && Parameter.Target_Server_Alternate_Local_IPv6.Storage.ss_family == 0
+		if (Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0 && 
+			Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family == 0 && 
+			Parameter.Target_Server_Local_Main_IPv6.Storage.ss_family == 0 && 
+			Parameter.Target_Server_Local_Alternate_IPv6.Storage.ss_family == 0
 		#if defined(ENABLE_LIBSODIUM)
-			&& DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.Storage.ss_family == 0 && DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family == 0
+			&& DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0
+			&& DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family == 0
 		#endif
 			)
 		{
@@ -962,28 +1145,28 @@ void GetGatewayInformation(
 		}
 	#if defined(PLATFORM_WIN)
 		DWORD AdaptersIndex = 0;
-		if ((Parameter.Target_Server_IPv6.AddressData.Storage.ss_family > 0 && 
+		if ((Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&Parameter.Target_Server_IPv6.AddressData.IPv6, 
+				(PSOCKADDR)&Parameter.Target_Server_Main_IPv6.AddressData.IPv6, 
 				&AdaptersIndex) != NO_ERROR) || 
-			(Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family > 0 && 
+			(Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
 				(PSOCKADDR)&Parameter.Target_Server_Alternate_IPv6.AddressData.IPv6, &
 				AdaptersIndex) != NO_ERROR) || 
-			(Parameter.Target_Server_Local_IPv6.Storage.ss_family > 0 && 
+			(Parameter.Target_Server_Local_Main_IPv6.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&Parameter.Target_Server_Local_IPv6.IPv6, 
+				(PSOCKADDR)&Parameter.Target_Server_Local_Main_IPv6.IPv6, 
 				&AdaptersIndex) != NO_ERROR) || 
-			(Parameter.Target_Server_Alternate_Local_IPv6.Storage.ss_family > 0 && 
+			(Parameter.Target_Server_Local_Alternate_IPv6.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&Parameter.Target_Server_Alternate_Local_IPv6.IPv6, 
+				(PSOCKADDR)&Parameter.Target_Server_Local_Alternate_IPv6.IPv6, 
 				&AdaptersIndex) != NO_ERROR)
 		#if defined(ENABLE_LIBSODIUM)
-			|| (DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.Storage.ss_family > 0 && 
+			|| (DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.IPv6, 
+				(PSOCKADDR)&DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.IPv6, 
 				&AdaptersIndex) != NO_ERROR) || 
-			(DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family > 0 && 
+			(DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
 				(PSOCKADDR)&DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.IPv6, 
 				&AdaptersIndex) != NO_ERROR)
@@ -1008,19 +1191,19 @@ void GetGatewayInformation(
 				}
 			}
 		}
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		if ((Parameter.Target_Server_IPv6.AddressData.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_IPv6.AddressData.Storage)) || 
-			(Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family > 0 && 
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		if ((Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Main_IPv6.AddressData.Storage)) || 
+			(Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0 && 
 			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Alternate_IPv6.AddressData.Storage)) || 
-			(Parameter.Target_Server_Local_IPv6.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Local_IPv6.Storage)) || 
-			(Parameter.Target_Server_Alternate_Local_IPv6.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Alternate_Local_IPv6.Storage))
+			(Parameter.Target_Server_Local_Main_IPv6.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Local_Main_IPv6.Storage)) || 
+			(Parameter.Target_Server_Local_Alternate_IPv6.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Local_Alternate_IPv6.Storage))
 		#if defined(ENABLE_LIBSODIUM)
-			|| (DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET6, &DNSCurveParameter.DNSCurve_Target_Server_IPv6.AddressData.Storage)) || 
-			(DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family > 0 && 
+			|| (DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET6, &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv6.AddressData.Storage)) || 
+			(DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0 && 
 			!GetBestInterfaceAddress(AF_INET6, &DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv6.AddressData.Storage))
 		#endif
 			)
@@ -1047,10 +1230,13 @@ void GetGatewayInformation(
 	}
 	else if (Protocol == AF_INET)
 	{
-		if (Parameter.Target_Server_IPv4.AddressData.Storage.ss_family == 0 && Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family == 0 && 
-			Parameter.Target_Server_Local_IPv4.Storage.ss_family == 0 && Parameter.Target_Server_Alternate_Local_IPv4.Storage.ss_family == 0
+		if (Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0 && 
+			Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family == 0 && 
+			Parameter.Target_Server_Local_Main_IPv4.Storage.ss_family == 0 && 
+			Parameter.Target_Server_Local_Alternate_IPv4.Storage.ss_family == 0
 		#if defined(ENABLE_LIBSODIUM)
-			&& DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.Storage.ss_family == 0 && DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family == 0
+			&& DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0
+			&& DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family == 0
 		#endif
 			)
 		{
@@ -1059,28 +1245,28 @@ void GetGatewayInformation(
 		}
 	#if defined(PLATFORM_WIN)
 		DWORD AdaptersIndex = 0;
-		if ((Parameter.Target_Server_IPv4.AddressData.Storage.ss_family > 0 && 
+		if ((Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&Parameter.Target_Server_IPv4.AddressData.IPv4, 
+				(PSOCKADDR)&Parameter.Target_Server_Main_IPv4.AddressData.IPv4, 
 				&AdaptersIndex) != NO_ERROR) || 
-			(Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family > 0 && 
+			(Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
 				(PSOCKADDR)&Parameter.Target_Server_Alternate_IPv4.AddressData.IPv4, 
 				&AdaptersIndex) != NO_ERROR) || 
-			(Parameter.Target_Server_Local_IPv4.Storage.ss_family > 0 && 
+			(Parameter.Target_Server_Local_Main_IPv4.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&Parameter.Target_Server_Local_IPv4.IPv4, 
+				(PSOCKADDR)&Parameter.Target_Server_Local_Main_IPv4.IPv4, 
 				&AdaptersIndex) != NO_ERROR) || 
-			(Parameter.Target_Server_Alternate_Local_IPv4.Storage.ss_family > 0 && 
+			(Parameter.Target_Server_Local_Alternate_IPv4.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
-				(PSOCKADDR)&Parameter.Target_Server_Alternate_Local_IPv4.IPv4, 
+				(PSOCKADDR)&Parameter.Target_Server_Local_Alternate_IPv4.IPv4, 
 				&AdaptersIndex) != NO_ERROR)
 		#if defined(ENABLE_LIBSODIUM)
-			|| DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.Storage.ss_family > 0 && 
+			|| DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
 			(GetBestInterfaceEx(
-				(PSOCKADDR)&DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.IPv4, 
+				(PSOCKADDR)&DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.IPv4, 
 				&AdaptersIndex) != NO_ERROR) || 
-			DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family > 0 && 
+			DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0 && 
 			(GetBestInterfaceEx(
 				(PSOCKADDR)&DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.IPv4, 
 				&AdaptersIndex) != NO_ERROR)
@@ -1105,19 +1291,19 @@ void GetGatewayInformation(
 				}
 			}
 		}
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-		if ((Parameter.Target_Server_IPv4.AddressData.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_IPv4.AddressData.Storage)) || 
-			(Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family > 0 && 
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		if ((Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Main_IPv4.AddressData.Storage)) || 
+			(Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0 && 
 			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Alternate_IPv4.AddressData.Storage)) || 
-			(Parameter.Target_Server_Local_IPv4.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Local_IPv4.Storage)) || 
-			(Parameter.Target_Server_Alternate_Local_IPv4.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Alternate_Local_IPv4.Storage))
+			(Parameter.Target_Server_Local_Main_IPv4.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Local_Main_IPv4.Storage)) || 
+			(Parameter.Target_Server_Local_Alternate_IPv4.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Local_Alternate_IPv4.Storage))
 		#if defined(ENABLE_LIBSODIUM)
-			|| (DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.Storage.ss_family > 0 && 
-			!GetBestInterfaceAddress(AF_INET, &DNSCurveParameter.DNSCurve_Target_Server_IPv4.AddressData.Storage)) || 
-			(DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family > 0 && 
+			|| (DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
+			!GetBestInterfaceAddress(AF_INET, &DNSCurveParameter.DNSCurve_Target_Server_Main_IPv4.AddressData.Storage)) || 
+			(DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0 && 
 			!GetBestInterfaceAddress(AF_INET, &DNSCurveParameter.DNSCurve_Target_Server_Alternate_IPv4.AddressData.Storage))
 		#endif
 			)
@@ -1163,7 +1349,7 @@ void NetworkInformationMonitor(
 	auto IsErrorFirstPrint = true;
 	std::string Result;
 	ssize_t Index = 0;
-#elif defined(PLATFORM_MACX)
+#elif defined(PLATFORM_MACOS)
 	ifaddrs *InterfaceAddressList = nullptr, *InterfaceAddressIter = nullptr;
 	auto IsErrorFirstPrint = true;
 #endif
@@ -1183,7 +1369,7 @@ void NetworkInformationMonitor(
 			LocalAddressList = GetLocalAddressList(AF_INET6, HostName);
 			if (LocalAddressList == nullptr)
 			{
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 			errno = 0;
 			if (getifaddrs(&InterfaceAddressList) != 0 || InterfaceAddressList == nullptr)
 			{
@@ -1286,7 +1472,7 @@ void NetworkInformationMonitor(
 						Result.shrink_to_fit();
 					}
 				}
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				for (InterfaceAddressIter = InterfaceAddressList;InterfaceAddressIter != nullptr;InterfaceAddressIter = InterfaceAddressIter->ifa_next)
 				{
 					if (InterfaceAddressIter->ifa_addr != nullptr && InterfaceAddressIter->ifa_addr->sa_family == AF_INET6)
@@ -1387,7 +1573,7 @@ void NetworkInformationMonitor(
 				goto JumpToRestart;
 			}
 			else {
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 			{
 		#endif
 				LocalAddressMutexIPv4.lock();
@@ -1460,7 +1646,7 @@ void NetworkInformationMonitor(
 						Result.shrink_to_fit();
 					}
 				}
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				for (InterfaceAddressIter = InterfaceAddressList;InterfaceAddressIter != nullptr;InterfaceAddressIter = InterfaceAddressIter->ifa_next)
 				{
 					if (InterfaceAddressIter->ifa_addr != nullptr && InterfaceAddressIter->ifa_addr->sa_family == AF_INET)
@@ -1531,7 +1717,7 @@ void NetworkInformationMonitor(
 		}
 
 	//Free all lists.
-	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		if (InterfaceAddressList != nullptr)
 			freeifaddrs(InterfaceAddressList);
 		InterfaceAddressList = nullptr;
@@ -1544,12 +1730,12 @@ void NetworkInformationMonitor(
 		{
 		#if defined(PLATFORM_WIN)
 			if (!GlobalRunningStatus.GatewayAvailable_IPv6)
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-			if (!IsErrorFirstPrint && !GlobalRunningStatus.GatewayAvailable_IPv6)
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			if (!(IsErrorFirstPrint || GlobalRunningStatus.GatewayAvailable_IPv6))
 		#endif
 				PrintError(LOG_LEVEL_3, LOG_ERROR_NETWORK, L"Not any available gateways to public network", 0, nullptr, 0);
 
-		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+		#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 			IsErrorFirstPrint = false;
 		#endif
 		}

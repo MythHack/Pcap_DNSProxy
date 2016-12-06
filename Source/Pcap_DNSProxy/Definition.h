@@ -17,6 +17,9 @@
 // Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
+#ifndef PCAP_DNSPROXY_DEFINITION_H
+#define PCAP_DNSPROXY_DEFINITION_H
+
 #include "Structure.h"
 
 //////////////////////////////////////////////////
@@ -104,9 +107,9 @@
 #define UNICODE_IDEOGRAPHIC_SPACE                     0x3000                      //Ideographic Space in CJK
 
 //Version definitions
-#define CONFIG_VERSION                                0.45                                  //Current configuration file version
+#define CONFIG_FILE_VERSION                           0.45                                  //Current configuration file version
 #define COPYRIGHT_MESSAGE                             L"Copyright (C) 2012-2016 Chengr28"   //Copyright message
-#define FULL_VERSION                                  L"0.4.7.8"                            //Current full version
+#define FULL_VERSION                                  L"0.4.8.2"                            //Current full version
 
 //Size and length definitions(Number)
 #define ADDRESS_STRING_MAXSIZE                        64U                         //Maximum size of addresses(IPv4/IPv6) words(64 bytes)
@@ -120,9 +123,11 @@
 #define DEFAULT_THREAD_POOL_MAXNUM                    256U                        //Default number of maximum thread pool size
 #define DNS_RR_MAXCOUNT_AAAA                          43U                         //Maximum Record Resources size of AAAA answers, 28 bytes * 43 = 1204 bytes
 #define DNS_RR_MAXCOUNT_A                             75U                         //Maximum Record Resources size of A answers, 16 bytes * 75 = 1200 bytes
-#define DNSCRYPT_KEYPAIR_MESSAGE_LEN                  80U                         //DNSCurve/DNScrypt keypair messages length
-#define DNSCRYPT_KEYPAIR_INTERVAL                     4U                          //DNSCurve/DNScrypt keypair interval length
-#define DNSCRYPT_RECORD_TXT_LEN                       124U                        //Length of DNScrypt TXT Records
+#if defined(ENABLE_LIBSODIUM)
+	#define DNSCRYPT_KEYPAIR_MESSAGE_LEN                  80U                         //DNSCurve/DNScrypt keypair messages length
+	#define DNSCRYPT_KEYPAIR_INTERVAL                     4U                          //DNSCurve/DNScrypt keypair interval length
+	#define DNSCRYPT_RECORD_TXT_LEN                       124U                        //Length of DNScrypt TXT Records
+#endif
 #define DOMAIN_DATA_MAXSIZE                           253U                        //Maximum data length of whole level domain is 253 bytes(Section 2.3.1 in RFC 1035).
 #define DOMAIN_LEVEL_DATA_MAXSIZE                     63U                         //Domain length is between 3 and 63(Labels must be 63 characters/bytes or less, Section 2.3.1 in RFC 1035).
 #define DOMAIN_MAXSIZE                                256U                        //Maximum size of whole level domain is 256 bytes(Section 2.3.1 in RFC 1035).
@@ -136,12 +141,12 @@
 #if defined(PLATFORM_LINUX)
 	#define ICMP_PADDING_LENGTH_LINUX                     40U
 	#define ICMP_STRING_START_NUM_LINUX                   16U
-#elif defined(PLATFORM_MACX)
-	#define ICMP_PADDING_LENGTH_MAC                       48U
-	#define ICMP_STRING_START_NUM_MAC                     8U
+#elif defined(PLATFORM_MACOS)
+	#define ICMP_PADDING_LENGTH_MACOS                     48U
+	#define ICMP_STRING_START_NUM_MACOS                   8U
 #endif
-#define IPV4_SHORTEST_ADDRSTRING                      6U                          //The shortest IPv4 address strings(*.*.*.*).
-#define IPV6_SHORTEST_ADDRSTRING                      3U                          //The shortest IPv6 address strings(::).
+#define IPV4_SHORTEST_ADDR_STRING                      6U                          //The shortest IPv4 address strings(*.*.*.*).
+#define IPV6_SHORTEST_ADDR_STRING                      2U                          //The shortest IPv6 address strings(::).
 #define LOG_READING_MAXSIZE                           8388608U                    //Maximum size of whole log file(8MB/8388608 bytes).
 #define LOG_READING_MINSIZE                           DEFAULT_LARGE_BUFFER_SIZE   //Minimum size of whole log file(4KB/4096 bytes).
 #define MULTIPLE_REQUEST_MAXNUM                       64U                         //Maximum number of multiple request.
@@ -157,14 +162,16 @@
 #define UINT8_MAX_STRING_LENGTH                       4U                          //Maximum number of 8 bits is 255, its length is 3.
 
 //Size and length definitions(Data)
-#define DNS_PACKET_MINSIZE                            (sizeof(dns_hdr) + 1U + sizeof(dns_qry))                                          //Minimum DNS packet size(DNS Header + Minimum Domain<ROOT> + DNS Query)
-#define EDNS_ADDITIONAL_MAXSIZE                       (sizeof(dns_record_opt) * 2U + sizeof(edns_client_subnet) + sizeof(in6_addr))     //Maximum of EDNS Additional Record Resources size
+#define DNS_PACKET_MINSIZE                            (sizeof(dns_hdr) + 1U + sizeof(dns_qry))                                                 //Minimum DNS packet size(DNS Header + Minimum Domain<ROOT> + DNS Query)
+#define EDNS_ADDITIONAL_MAXSIZE                       (sizeof(dns_record_opt) * 2U + sizeof(edns_client_subnet) + sizeof(in6_addr))            //Maximum of EDNS Additional Record Resources size
 #define HTTP_TOP_HEADER_LENGTH                        (strlen("HTTP/"))
 #define HTTP_RESPONSE_MINSIZE                         (HTTP_TOP_HEADER_LENGTH + HTTP_VERSION_LENGTH + strlen(" ") + HTTP_STATUS_CODE_LENGTH)   //Minimum size of HTTP server response
-#define DNSCRYPT_BUFFER_RESERVE_LEN                   (DNSCURVE_MAGIC_QUERY_LEN + crypto_box_PUBLICKEYBYTES + crypto_box_HALF_NONCEBYTES - crypto_box_BOXZEROBYTES)
-#define DNSCRYPT_BUFFER_RESERVE_TCP_LEN               (sizeof(uint16_t) + DNSCURVE_MAGIC_QUERY_LEN + crypto_box_PUBLICKEYBYTES + crypto_box_HALF_NONCEBYTES - crypto_box_BOXZEROBYTES)
-#define DNSCRYPT_PACKET_MINSIZE                       (DNSCURVE_MAGIC_QUERY_LEN + crypto_box_NONCEBYTES + DNS_PACKET_MINSIZE)
-#define DNSCRYPT_RESERVE_HEADER_LEN                   (sizeof(ipv6_hdr) + sizeof(udp_hdr) + DNSCRYPT_BUFFER_RESERVE_LEN)
+#if defined(ENABLE_LIBSODIUM)
+	#define DNSCRYPT_BUFFER_RESERVE_LEN                   (DNSCURVE_MAGIC_QUERY_LEN + crypto_box_PUBLICKEYBYTES + crypto_box_HALF_NONCEBYTES - crypto_box_BOXZEROBYTES)
+	#define DNSCRYPT_BUFFER_RESERVE_TCP_LEN               (sizeof(uint16_t) + DNSCURVE_MAGIC_QUERY_LEN + crypto_box_PUBLICKEYBYTES + crypto_box_HALF_NONCEBYTES - crypto_box_BOXZEROBYTES)
+	#define DNSCRYPT_PACKET_MINSIZE                       (DNSCURVE_MAGIC_QUERY_LEN + crypto_box_NONCEBYTES + DNS_PACKET_MINSIZE)
+	#define DNSCRYPT_RESERVE_HEADER_LEN                   (sizeof(ipv6_hdr) + sizeof(udp_hdr) + DNSCRYPT_BUFFER_RESERVE_LEN)
+#endif
 
 //Code definitions
 #define CHECKSUM_SUCCESS                              0                           //Result of getting correct checksum.
@@ -176,7 +183,7 @@
 #if defined(PLATFORM_WIN)
 	#define SYSTEM_SOCKET                                 UINT_PTR                     //System Socket defined(WinSock2.h), which is not the same in x86 and x64 platform and defined in WinSock2.h file.
 	#define QUERY_SERVICE_CONFIG_BUFFER_MAXSIZE           8192U                        //Buffer maximum size of QueryServiceConfig function(8KB/8192 Bytes)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	#define SYSTEM_SOCKET                                 int
 #endif
 
@@ -185,7 +192,7 @@
 #define DEFAULT_ALTERNATE_RESET_TIME                  180U                        //Default time to reset switching of alternate servers(180 seconds/2 minutes)
 #define DEFAULT_ALTERNATE_TIMES                       5U                          //Default times of request timeout(5 times)
 #define DEFAULT_DOMAIN_TEST_INTERVAL_TIME             900U                        //Default Domain Test time between every sending(900 seconds/15 minutes)
-#define DEFAULT_FILEREFRESH_TIME                      15000U                      //Default time between files auto-refreshing(15000 ms/15 seconds)
+#define DEFAULT_FILE_REFRESH_TIME                     15000U                      //Default time between files auto-refreshing(15000 ms/15 seconds)
 #define DEFAULT_HOSTS_TTL                             900U                        //Default Hosts DNS TTL(900 seconds/15 minutes)
 #define DEFAULT_ICMP_TEST_TIME                        900U                        //Default time between ICMP Test(900 seconds/15 minutes)
 #if defined(ENABLE_PCAP)
@@ -196,7 +203,7 @@
 #define DEFAULT_RELIABLE_ONCE_SOCKET_TIMEOUT          3000U                       //Default timeout of reliable once sockets(Such as TCP, 3000 ms/3 seconds)
 #define DEFAULT_RELIABLE_SERIAL_SOCKET_TIMEOUT        1500U                       //Default timeout of reliable serial sockets(Such as TCP, 1500 ms/1.5 second)
 #define DEFAULT_UNRELIABLE_ONCE_SOCKET_TIMEOUT        2000U                       //Default timeout of unreliable once sockets(Such as ICMP/ICMPv6/UDP, 2000 ms/2 seconds)
-#define DEFAULT_UNRELIABLE_SERIAL_SOCKET_TIMEOUT      1000U                        //Default timeout of unreliable serial sockets(Such as ICMP/ICMPv6/UDP, 1000 ms/1 second)
+#define DEFAULT_UNRELIABLE_SERIAL_SOCKET_TIMEOUT      1000U                       //Default timeout of unreliable serial sockets(Such as ICMP/ICMPv6/UDP, 1000 ms/1 second)
 #if defined(ENABLE_LIBSODIUM)
 	#define DEFAULT_DNSCURVE_RECHECK_TIME                 1800U                                    //Default DNSCurve keys recheck time(30 minutes/1800 seconds)
 	#define DEFAULT_DNSCURVE_RELIABLE_SOCKET_TIMEOUT      DEFAULT_RELIABLE_ONCE_SOCKET_TIMEOUT     //Same as default timeout of reliable sockets
@@ -204,7 +211,7 @@
 	#define SHORTEST_DNSCURVE_RECHECK_TIME                10U                                      //The shortset DNSCurve keys recheck time(10 seconds)
 #endif
 #define FLUSH_DNS_CACHE_INTERVAL_TIME                 5U                          //Time between every flushing(5 seconds)
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	#define LOOP_INTERVAL_TIME_NO_DELAY                   20000U                         //No delay mode loop interval time(20000 us/20 ms)
 #endif
 #define LOOP_MAX_TIMES                                16U                         //Maximum of loop times(16 times)
@@ -220,7 +227,9 @@
 #define SHORTEST_THREAD_POOL_RESET_TIME               5U                          //The shortset time to reset thread pool number(5 seconds)
 #define SOCKET_MIN_TIMEOUT                            500U                        //The shortest socket timeout(500 ms)
 #define STANDARD_TIMEOUT                              1000U                       //Standard timeout(1000 ms/1 second)
-#define UPDATE_SERVICE_TIME                           3000U                       //Update service timeout(3 seconds/3000 ms)
+#if defined(PLATFORM_WIN)
+	#define UPDATE_SERVICE_TIME                           3000U                       //Update service timeout(3 seconds/3000 ms)
+#endif
 
 //Data definitions
 #if defined(PLATFORM_WIN)
@@ -237,12 +246,15 @@
 	#define CONFIG_FILE_NAME_LIST                         L"Config.ini", L"Config.conf", L"Config.cfg", L"Config"
 	#define ERROR_LOG_FILE_NAME                           L"Error.log"
 	#define DEFAULT_ICMP_PADDING_DATA                     ("abcdefghijklmnopqrstuvwabcdefghi")         //Default ICMP padding data in Windows
+	#if defined(ENABLE_LIBSODIUM)
+		#define DNSCURVE_KEY_PAIR_FILE_NAME                   L"KeyPair.txt"
+	#endif
 	#define MAILSLOT_MESSAGE_FLUSH_DNS                    L"Flush Pcap_DNSProxy DNS cache"             //The mailslot message to flush dns cache
 	#define MAILSLOT_MESSAGE_FLUSH_DNS_DOMAIN             L"Flush Pcap_DNSProxy DNS cache: "           //The mailslot message to flush dns cache(Single domain)
 	#define MAILSLOT_NAME                                 L"\\\\.\\mailslot\\pcap_dnsproxy_mailslot"   //MailSlot name
 	#define SID_ADMINISTRATORS_GROUP                      L"S-1-5-32-544"                              //Windows SID of Administrators group
 	#define SYSTEM_SERVICE_NAME                           L"PcapDNSProxyService"                       //System service name
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	#if defined(PLATFORM_LINUX)
 		#define COMMAND_DISABLE_DAEMON                        ("--disable-daemon")
 	#endif
@@ -257,15 +269,18 @@
 	#define COMMAND_SHORT_SET_PATH                        ("-c")
 	#define CONFIG_FILE_NAME_LIST                         L"Config.conf", L"Config.ini", L"Config.cfg", L"Config"
 	#define CONFIG_FILE_NAME_LIST_STRING                  "Config.conf", "Config.ini", "Config.cfg", "Config"
+	#if defined(ENABLE_LIBSODIUM)
+		#define DNSCURVE_KEY_PAIR_FILE_NAME                   ("KeyPair.txt")
+	#endif
 	#define ERROR_LOG_FILE_NAME                           L"Error.log"
-	#define ERROR_LOG_FILE_NAME_STRING                    ("Error.log")
+	#define ERROR_LOG_FILE_NAME_MBS                       ("Error.log")
 	#define FIFO_MESSAGE_FLUSH_DNS                        ("Flush DNS cache of Pcap_DNSProxy")         //The FIFO message to flush dns cache
 	#define FIFO_MESSAGE_FLUSH_DNS_DOMAIN                 ("Flush DNS cache of Pcap_DNSProxy: ")       //The FIFO message to flush dns cache(Single domain)
 	#define FIFO_PATH_NAME                                ("/tmp/pcap_dnsproxy_fifo")                  //FIFO pathname
 #endif
 #define DEFAULT_HTTP_CONNECT_VERSION                  ("1.1")                                      //Default HTTP CONNECT version
-#define DEFAULT_LOCAL_SERVERNAME                      ("pcap-dnsproxy.server")                     //Default Local DNS server name
-#if defined(PLATFORM_MACX)
+#define DEFAULT_LOCAL_SERVER_NAME                     ("pcap-dnsproxy.server")                     //Default Local DNS server name
+#if defined(PLATFORM_MACOS)
 	#define DEFAULT_SEQUENCE                               0
 #else
 	#define DEFAULT_SEQUENCE                               0x0001                                      //Default sequence of protocol
@@ -276,16 +291,16 @@
 
 //Base64 definitions
 #define BASE64_PAD                                    ('=')
-//#define BASE64_DECODE_FIRST                           ('+')
-//#define BASE64_DECODE_LAST                            ('z')
-//#define BASE64_DECODE_OUT_SIZE(Message)               (((Message)) / 4U * 3U)
+#define BASE64_DECODE_FIRST                           ('+')
+#define BASE64_DECODE_LAST                            ('z')
+#define BASE64_DECODE_OUT_SIZE(Message)               (((Message)) / 4U * 3U)
 #define BASE64_ENCODE_OUT_SIZE(Message)               (((Message) + 2U) / 3U * 4U)
 
 //Read text input types and Compare addresses definitions
 #define ADDRESS_COMPARE_LESS                          1U
 #define ADDRESS_COMPARE_EQUAL                         2U
 #define ADDRESS_COMPARE_GREATER                       3U
-#define READ_TEXT_PARAMETER                           0
+#define READ_TEXT_PARAMETER_NORMAL                    0
 #define READ_TEXT_PARAMETER_MONITOR                   1U
 #define READ_TEXT_HOSTS                               2U
 #define READ_TEXT_IPFILTER                            3U
@@ -383,8 +398,10 @@
 #define REQUEST_PROCESS_SOCKS_MAIN                    2U
 #define REQUEST_PROCESS_HTTP_CONNECT                  3U
 #define REQUEST_PROCESS_DIRECT                        4U
-#define REQUEST_PROCESS_DNSCURVE_MAIN                 5U
-#define REQUEST_PROCESS_DNSCURVE_SIGN                 6U
+#if defined(ENABLE_LIBSODIUM)
+	#define REQUEST_PROCESS_DNSCURVE_MAIN                 5U
+	#define REQUEST_PROCESS_DNSCURVE_SIGN                 6U
+#endif
 #define REQUEST_PROCESS_TCP                           7U
 #define REQUEST_PROCESS_UDP_NORMAL                    8U
 #define REQUEST_PROCESS_UDP_NO_MARKING                9U
@@ -416,23 +433,25 @@
 	#define TLS_VERSION_1_3                           13U
 	#if defined(PLATFORM_WIN)
 		#define SSPI_SECURE_BUFFER_NUM                    4U
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		#define OPENSSL_VERSION_1_0_1                     0x10001000L
+		#define OPENSSL_VERSION_1_0_2                     0x10002000L
 		#define OPENSSL_VERSION_1_1_0                     0x10100000L
 		#define OPENSSL_STATIC_BUFFER_SIZE                256U
-		#define OPENSSL_STRONG_CIPHER_LIST                ("HIGH:!SSLv2:!SSLv3:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4")
+		#define OPENSSL_CIPHER_LIST_COMPATIBILITY         ("HIGH:!SSLv2:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4")
+		#define OPENSSL_CIPHER_LIST_STRONG                ("HIGH:!SSLv2:!SSLv3:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4")
 	#endif
 #endif
 
 
 //////////////////////////////////////////////////
 // Function definitions(Part 2)
-#define hton16_Force(Value)   ((uint16_t)(((uint8_t *)&Value)[0] << (sizeof(uint8_t) * BYTES_TO_BITS) | ((uint8_t *)&Value)[1U]))
+#define hton16_Force(Value)   ((uint16_t)(((uint8_t *)&(Value))[0] << (sizeof(uint8_t) * BYTES_TO_BITS) | ((uint8_t *)&(Value))[1U]))
 #define ntoh16_Force          hton16_Force
-#define hton32_Force(Value)   ((uint32_t)(((uint8_t *)&Value)[0] << ((sizeof(uint16_t) + sizeof(uint8_t)) * BYTES_TO_BITS) | ((uint8_t *)&Value)[1U] << (sizeof(uint16_t) * BYTES_TO_BITS) | ((uint8_t *)&Value)[2U] << (sizeof(uint8_t) * BYTES_TO_BITS) | ((uint8_t *)&Value)[3U]))
+#define hton32_Force(Value)   ((uint32_t)(((uint8_t *)&(Value))[0] << ((sizeof(uint16_t) + sizeof(uint8_t)) * BYTES_TO_BITS) | ((uint8_t *)&(Value))[1U] << (sizeof(uint16_t) * BYTES_TO_BITS) | ((uint8_t *)&(Value))[2U] << (sizeof(uint8_t) * BYTES_TO_BITS) | ((uint8_t *)&(Value))[3U]))
 #define ntoh32_Force          hton32_Force
 #if BYTE_ORDER == LITTLE_ENDIAN
-	#define hton64(Value)         ((uint64_t)((((uint64_t)htonl((uint32_t)((Value << (sizeof(uint32_t) * BYTES_TO_BITS)) >> (sizeof(uint32_t) * BYTES_TO_BITS)))) << (sizeof(uint32_t) * BYTES_TO_BITS)) | (uint32_t)htonl((uint32_t)(Value >> (sizeof(uint32_t) * BYTES_TO_BITS)))))
+	#define hton64(Value)         ((uint64_t)((((uint64_t)htonl((uint32_t)(((Value) << (sizeof(uint32_t) * BYTES_TO_BITS)) >> (sizeof(uint32_t) * BYTES_TO_BITS)))) << (sizeof(uint32_t) * BYTES_TO_BITS)) | (uint32_t)htonl((uint32_t)((Value) >> (sizeof(uint32_t) * BYTES_TO_BITS)))))
 #else //BIG_ENDIAN
 	#define hton64(Value)         Value
 #endif
@@ -444,7 +463,7 @@
 		#define GetCurrentSystemTime   GetTickCount64
 	#endif
 	#define Sleep(Millisecond)     Sleep((DWORD)(Millisecond))
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	#define Sleep(Millisecond)     usleep((useconds_t)((Millisecond) * MICROSECOND_TO_MILLISECOND))
 	#define usleep(Millisecond)    usleep((useconds_t)(Millisecond))
 #endif
@@ -457,8 +476,8 @@
 typedef struct _file_data_
 {
 	std::wstring                         FileName;
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-	std::string                          sFileName;
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	std::string                          MBS_FileName;
 #endif
 	time_t                               ModificationTime;
 }FileData, FILE_DATA, *PFileData, *PFILE_DATA;
@@ -486,11 +505,13 @@ typedef union _address_union_data_
 }AddressUnionData, ADDRESS_UNION_DATA, *PAddressUnionData, *PADDRESS_UNION_DATA;
 
 //Hop Limit and TTL Data structure
+#if defined(ENABLE_PCAP)
 typedef union _hoplimit_data_
 {
 	uint8_t                              TTL;
 	uint8_t                              HopLimit;
 }HopLimitUnionData, HOP_LIMIT_UNION_DATA, *PHopLimitUnionData, *PHOP_LIMIT_UNION_DATA;
+#endif
 
 //DNS Server Data structure
 typedef struct _dns_server_data_
@@ -536,9 +557,10 @@ typedef struct _dns_packet_data_
 //Packet attributes block
 	size_t                               BufferSize;
 	size_t                               Length;
-	uint16_t                             Protocol;
-	bool                                 IsLocal;
 	ADDRESS_UNION_DATA                   LocalTarget;
+	uint16_t                             Protocol;
+	bool                                 IsLocalRequest;
+	bool                                 IsLocalForce;
 }DNSPacketData, DNS_PACKET_DATA, *PDNSPacketData, *PDNS_PACKET_DATA;
 
 //DNS Cache Data structure
@@ -547,8 +569,8 @@ typedef struct _dns_cache_data_
 	std::string                          Domain;
 	std::shared_ptr<uint8_t>             Response;
 	size_t                               Length;
-	uint16_t                             RecordType;
 	uint64_t                             ClearCacheTime;
+	uint16_t                             RecordType;
 }DNSCacheData, DNS_CACHE_DATA, *PDNSCacheData, *PDNS_CACHE_DATA;
 
 //Monitor Queue Data structure
@@ -585,8 +607,8 @@ typedef struct _dnscurve_socket_selecting_data_
 //Configuration class
 typedef class ConfigurationTable
 {
-public:
 //Parameters from configure files
+public:
 //[Base] block
 	double                               Version;
 	size_t                               FileRefreshTime;
@@ -604,9 +626,9 @@ public:
 	size_t                               ListenProtocol_Network;
 	size_t                               ListenProtocol_Transport;
 	std::vector<uint16_t>                *ListenPort;
-	bool                                 IPFilterType;
+	bool                                 IsIPFilterTypePermit;
 	size_t                               IPFilterLevel;
-	bool                                 AcceptType;
+	bool                                 IsAcceptTypePermit;
 	std::vector<uint16_t>                *AcceptTypeList;
 //[DNS] block
 	size_t                               RequestMode_Network;
@@ -627,14 +649,14 @@ public:
 	std::vector<sockaddr_storage>        *ListenAddress_IPv4;
 	PADDRESS_PREFIX_BLOCK                LocalMachineSubnet_IPv6;
 	PADDRESS_PREFIX_BLOCK                LocalMachineSubnet_IPv4;
-	DNS_SERVER_DATA                      Target_Server_IPv6;
+	DNS_SERVER_DATA                      Target_Server_Main_IPv6;
 	DNS_SERVER_DATA                      Target_Server_Alternate_IPv6;
-	DNS_SERVER_DATA                      Target_Server_IPv4;
+	DNS_SERVER_DATA                      Target_Server_Main_IPv4;
 	DNS_SERVER_DATA                      Target_Server_Alternate_IPv4;
-	ADDRESS_UNION_DATA                   Target_Server_Local_IPv6;
-	ADDRESS_UNION_DATA                   Target_Server_Alternate_Local_IPv6;
-	ADDRESS_UNION_DATA                   Target_Server_Local_IPv4;
-	ADDRESS_UNION_DATA                   Target_Server_Alternate_Local_IPv4;
+	ADDRESS_UNION_DATA                   Target_Server_Local_Main_IPv6;
+	ADDRESS_UNION_DATA                   Target_Server_Local_Alternate_IPv6;
+	ADDRESS_UNION_DATA                   Target_Server_Local_Main_IPv4;
+	ADDRESS_UNION_DATA                   Target_Server_Local_Alternate_IPv4;
 	std::vector<DNS_SERVER_DATA>         *Target_Server_IPv6_Multiple;
 	std::vector<DNS_SERVER_DATA>         *Target_Server_IPv4_Multiple;
 //[Values] block
@@ -648,7 +670,7 @@ public:
 	DWORD                                PacketHopLimits_IPv4_End;
 	DWORD                                PacketHopLimits_IPv6_Begin;
 	DWORD                                PacketHopLimits_IPv6_End;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	int                                  PacketHopLimits_IPv4_Begin;
 	int                                  PacketHopLimits_IPv4_End;
 	int                                  PacketHopLimits_IPv6_Begin;
@@ -659,13 +681,13 @@ public:
 #endif
 #if defined(PLATFORM_WIN)
 	DWORD                                SocketTimeout_Reliable_Once;
-	DWORD                                SocketTimeout_Unreliable_Once;
 	DWORD                                SocketTimeout_Reliable_Serial;
+	DWORD                                SocketTimeout_Unreliable_Once;
 	DWORD                                SocketTimeout_Unreliable_Serial;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	timeval                              SocketTimeout_Reliable_Once;
-	timeval                              SocketTimeout_Unreliable_Once;
 	timeval                              SocketTimeout_Reliable_Serial;
+	timeval                              SocketTimeout_Unreliable_Once;
 	timeval                              SocketTimeout_Unreliable_Serial;
 #endif
 	size_t                               ReceiveWaiting;
@@ -685,7 +707,9 @@ public:
 	bool                                 EDNS_Switch_SOCKS;
 	bool                                 EDNS_Switch_HTTP_CONNECT;
 	bool                                 EDNS_Switch_Direct;
+#if defined(ENABLE_LIBSODIUM)
 	bool                                 EDNS_Switch_DNSCurve;
+#endif
 	bool                                 EDNS_Switch_TCP;
 	bool                                 EDNS_Switch_UDP;
 	bool                                 EDNS_ClientSubnet_Relay;
@@ -700,6 +724,7 @@ public:
 #endif
 	bool                                 HeaderCheck_DNS;
 	bool                                 DataCheck_Blacklist;
+	bool                                 DataCheck_Strict_RR_TTL;
 //[Data] block
 #if defined(ENABLE_PCAP)
 	uint16_t                             ICMP_ID;
@@ -742,8 +767,8 @@ public:
 	size_t                               HTTP_CONNECT_TLS_Version;
 	bool                                 HTTP_CONNECT_TLS_Validation;
 	std::wstring                         *HTTP_CONNECT_TLS_SNI;
-	std::string                          *sHTTP_CONNECT_TLS_SNI;
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+	std::string                          *MBS_HTTP_CONNECT_TLS_SNI;
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	std::string                          *HTTP_CONNECT_TLS_AddressString_IPv4;
 	std::string                          *HTTP_CONNECT_TLS_AddressString_IPv6;
 #endif
@@ -778,7 +803,7 @@ public:
 //Libraries initialization status
 #if defined(PLATFORM_WIN)
 	bool                                 IsWinSockInitialized;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 #if defined(ENABLE_TLS)
 	bool                                 IsOpenSSLInitialized;
 #endif
@@ -795,20 +820,20 @@ public:
 	std::default_random_engine           *RamdomEngine;
 	uint8_t                              *DomainTable;
 	uint8_t                              *Base64_EncodeTable;
-//	int8_t                               *Base64_DecodeTable;
+	int8_t                               *Base64_DecodeTable;
 	std::atomic<size_t>                  *ThreadRunningNum;
 	std::atomic<size_t>                  *ThreadRunningFreeNum;
 
-//Path and file status
+//Path list and file list status
 	std::vector<std::wstring>            *Path_Global;
 	std::wstring                         *Path_ErrorLog;
 	std::vector<std::wstring>            *FileList_Hosts;
 	std::vector<std::wstring>            *FileList_IPFilter;
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-	std::vector<std::string>             *sPath_Global;
-	std::string                          *sPath_ErrorLog;
-	std::vector<std::string>             *sFileList_Hosts;
-	std::vector<std::string>             *sFileList_IPFilter;
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	std::vector<std::string>             *MBS_Path_Global;
+	std::string                          *MBS_Path_ErrorLog;
+	std::vector<std::string>             *MBS_FileList_Hosts;
+	std::vector<std::string>             *MBS_FileList_IPFilter;
 #endif
 
 //Network status
@@ -864,8 +889,8 @@ public:
 typedef class AlternateSwapTable
 {
 public:
-	bool                                 IsSwap[ALTERNATE_SERVERNUM];
 	size_t                               TimeoutTimes[ALTERNATE_SERVERNUM];
+	bool                                 IsSwap[ALTERNATE_SERVERNUM];
 
 //Member functions
 	AlternateSwapTable(
@@ -876,7 +901,7 @@ public:
 typedef class ResultBlacklistTable
 {
 public:
-	std::vector<AddressRangeTable>       Addresses;
+	std::vector<ADDRESS_RANGE_TABLE>     Addresses;
 	std::regex                           PatternRegex;
 	std::string                          PatternString;
 }RESULT_BLACKLIST_TABLE;
@@ -885,17 +910,17 @@ public:
 typedef class AddressHostsTable
 {
 public:
-	std::vector<sockaddr_storage>        Address_Target;
-	std::vector<AddressRangeTable>       Address_Source;
+	std::vector<ADDRESS_PREFIX_BLOCK>    Address_Target;
+	std::vector<ADDRESS_RANGE_TABLE>     Address_Source;
 }ADDRESS_HOSTS_TABLE;
 
 //Address routing table class
 typedef class AddressRoutingTable
 {
 public:
-	size_t                                   Prefix;
 	std::map<uint64_t, std::set<uint64_t>>   AddressRoutingList_IPv6;
 	std::set<uint32_t>                       AddressRoutingList_IPv4;
+	size_t                                   Prefix;
 
 //Member functions
 	AddressRoutingTable(
@@ -909,10 +934,10 @@ typedef class OutputPacketTable
 public:
 	std::vector<SOCKET_DATA>             SocketData_Output;
 	SOCKET_DATA                          SocketData_Input;
+	size_t                               ReceiveIndex;
 	uint16_t                             Protocol_Network;
 	uint16_t                             Protocol_Transport;
 	uint64_t                             ClearPortTime;
-	size_t                               ReceiveIndex;
 
 //Member functions
 	OutputPacketTable(
@@ -961,7 +986,7 @@ public:
 #if defined(PLATFORM_WIN)
 	DWORD                                DNSCurve_SocketTimeout_Reliable;
 	DWORD                                DNSCurve_SocketTimeout_Unreliable;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	timeval                              DNSCurve_SocketTimeout_Reliable;
 	timeval                              DNSCurve_SocketTimeout_Unreliable;
 #endif
@@ -972,9 +997,9 @@ public:
 //[DNSCurve Addresses] block
 	uint8_t                              *Client_PublicKey;
 	uint8_t                              *Client_SecretKey;
-	DNSCURVE_SERVER_DATA                 DNSCurve_Target_Server_IPv6;
+	DNSCURVE_SERVER_DATA                 DNSCurve_Target_Server_Main_IPv6;
 	DNSCURVE_SERVER_DATA                 DNSCurve_Target_Server_Alternate_IPv6;
-	DNSCURVE_SERVER_DATA                 DNSCurve_Target_Server_IPv4;
+	DNSCURVE_SERVER_DATA                 DNSCurve_Target_Server_Main_IPv4;
 	DNSCURVE_SERVER_DATA                 DNSCurve_Target_Server_Alternate_IPv4;
 
 //Member functions
@@ -999,8 +1024,8 @@ typedef class SSPIHandleTable
 public:
 	CredHandle                           ClientCredentials;
 	CtxtHandle                           ContextHandle;
-	DWORD                                InputFlags;
 	SecPkgContext_StreamSizes            StreamSizes;
+	DWORD                                InputFlags;
 	SECURITY_STATUS                      LastReturnValue;
 
 //Member functions
@@ -1009,7 +1034,7 @@ public:
 	~SSPIHandleTable(
 		void);
 }SSPI_HANDLE_TABLE;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //OpenSSL Context class
 typedef class OpenSSLContextTable
 {
@@ -1025,5 +1050,6 @@ public:
 	~OpenSSLContextTable(
 		void);
 }OPENSSL_CONTEXT_TABLE;
+#endif
 #endif
 #endif

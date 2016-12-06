@@ -70,7 +70,7 @@ bool PrintError(
 			ErrorMessage.append(L"[Notice] ");
 		}break;
 	//System Error
-	//About System Error Codes, see https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381(v=vs.85).aspx.
+	//About System Error Codes, visit https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381(v=vs.85).aspx.
 		case LOG_ERROR_SYSTEM:
 		{
 			ErrorMessage.append(L"[System Error] ");
@@ -91,7 +91,7 @@ bool PrintError(
 			ErrorMessage.append(L"[Hosts Error] ");
 		}break;
 	//Network Error
-	//About Windows Sockets Error Codes, see https://msdn.microsoft.com/en-us/library/windows/desktop/ms740668(v=vs.85).aspx.
+	//About Windows Sockets error codes, visit https://msdn.microsoft.com/en-us/library/windows/desktop/ms740668(v=vs.85).aspx.
 		case LOG_ERROR_NETWORK:
 		{
 		//Block error messages when getting Network Unreachable and Host Unreachable error.
@@ -100,7 +100,8 @@ bool PrintError(
 			else 
 				ErrorMessage.append(L"[Network Error] ");
 		}break;
-	//WinPcap Error
+	//WinPcap/LibPcap Error
+	//About WinPcap/LibPcap error codes, visit https://www.winpcap.org/docs/docs_40_2/html/group__wpcapfunc.html.
 	#if defined(ENABLE_PCAP)
 		case LOG_ERROR_PCAP:
 		{
@@ -108,7 +109,7 @@ bool PrintError(
 			ErrorMessage.append(L"[Pcap Error] ");
 			ErrorMessage.append(Message);
 
-			return WriteScreenAndFile(ErrorMessage, ErrorCode, Line);
+			return WriteMessage_ScreenFile(ErrorMessage, ErrorCode, Line);
 		}break;
 	#endif
 	//DNSCurve Error
@@ -124,11 +125,14 @@ bool PrintError(
 			ErrorMessage.append(L"[SOCKS Error] ");
 		}break;
 	//HTTP CONNECT Error
+	//About HTTP status codes, vitis https://en.wikipedia.org/wiki/List_of_HTTP_status_codes.
 		case LOG_ERROR_HTTP_CONNECT:
 		{
 			ErrorMessage.append(L"[HTTP CONNECT Error] ");
 		}break;
 	//TLS Error
+	//About SSPI/SChannel error codes, visit https://msdn.microsoft.com/en-us/library/windows/desktop/aa380499(v=vs.85).aspx and https://msdn.microsoft.com/en-us/library/windows/desktop/dd721886(v=vs.85).aspx.
+	//About OpenSSL error codes, visit https://www.openssl.org/docs/manmaster/man3/ERR_get_error.html.
 	#if defined(ENABLE_TLS)
 		case LOG_ERROR_TLS:
 		{
@@ -149,11 +153,11 @@ bool PrintError(
 	ErrorMessage.append(L".\n");
 
 //Print error log.
-	return WriteScreenAndFile(ErrorMessage, ErrorCode, Line);
+	return WriteMessage_ScreenFile(ErrorMessage, ErrorCode, Line);
 }
 
 //Write to screen and file
-bool WriteScreenAndFile(
+bool WriteMessage_ScreenFile(
 	const std::wstring Message, 
 	const ssize_t ErrorCode, 
 	const size_t Line)
@@ -164,7 +168,7 @@ bool WriteScreenAndFile(
 	const auto TimeValues = time(nullptr);
 #if defined(PLATFORM_WIN)
 	if (localtime_s(&TimeStructure, &TimeValues) != 0)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	if (localtime_r(&TimeValues, &TimeStructure) == nullptr)
 #endif
 		return false;
@@ -239,12 +243,12 @@ bool WriteScreenAndFile(
 				return false;
 		}
 	}
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	struct stat FileStatData;
 	memset(&FileStatData, 0, sizeof(FileStatData));
-	if (stat(GlobalRunningStatus.sPath_ErrorLog->c_str(), &FileStatData) == 0 && FileStatData.st_size >= (off_t)Parameter.LogMaxSize)
+	if (stat(GlobalRunningStatus.MBS_Path_ErrorLog->c_str(), &FileStatData) == 0 && FileStatData.st_size >= (off_t)Parameter.LogMaxSize)
 	{
-		if (remove(GlobalRunningStatus.sPath_ErrorLog->c_str()) == 0)
+		if (remove(GlobalRunningStatus.MBS_Path_ErrorLog->c_str()) == 0)
 			IsFileDeleted = true;
 		else 
 			return false;
@@ -255,8 +259,8 @@ bool WriteScreenAndFile(
 #if defined(PLATFORM_WIN)
 	FILE *FileHandle = nullptr;
 	if (_wfopen_s(&FileHandle, GlobalRunningStatus.Path_ErrorLog->c_str(), L"a,ccs=UTF-8") == 0 && FileHandle != nullptr)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
-	auto FileHandle = fopen(GlobalRunningStatus.sPath_ErrorLog->c_str(), "a");
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	auto FileHandle = fopen(GlobalRunningStatus.MBS_Path_ErrorLog->c_str(), "a");
 	if (FileHandle != nullptr)
 #endif
 	{
@@ -363,15 +367,14 @@ void ErrorCodeToMessage(
 	{
 	//Define error code format.
 	#if defined(ENABLE_TLS)
-	#if defined(PLATFORM_WIN)
-		if (ErrorType == LOG_ERROR_TLS)
-			Message.append(L"0x%x");
-		else 
+		#if defined(PLATFORM_WIN)
+			if (ErrorType == LOG_ERROR_TLS)
+				Message.append(L"0x%x");
+			else 
+		#endif
 	#endif
-	#endif
-		if (ErrorType == LOG_MESSAGE_NOTICE || ErrorType == LOG_ERROR_SYSTEM || ErrorType == LOG_ERROR_SOCKS || 
-			ErrorType == LOG_ERROR_HTTP_CONNECT)
-				Message.append(L"%u");
+		if (ErrorType == LOG_MESSAGE_NOTICE || ErrorType == LOG_ERROR_SYSTEM || ErrorType == LOG_ERROR_SOCKS || ErrorType == LOG_ERROR_HTTP_CONNECT)
+			Message.append(L"%u");
 		else 
 			Message.append(L"%d");
 
@@ -389,11 +392,11 @@ void ErrorCodeToMessage(
 
 	//Define error code format.
 	#if defined(ENABLE_TLS)
-	#if defined(PLATFORM_WIN)
-		if (ErrorType == LOG_ERROR_TLS)
-			Message.append(L"[0x%x]");
-		else 
-	#endif
+		#if defined(PLATFORM_WIN)
+			if (ErrorType == LOG_ERROR_TLS)
+				Message.append(L"[0x%x]");
+			else 
+		#endif
 	#endif
 		if (ErrorType == LOG_ERROR_SYSTEM || ErrorType == LOG_ERROR_SOCKS || ErrorType == LOG_ERROR_HTTP_CONNECT)
 			Message.append(L"[%u]");
@@ -403,10 +406,10 @@ void ErrorCodeToMessage(
 	//Free pointer.
 		LocalFree(InnerMessage);
 	}
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	std::wstring InnerMessage;
 	auto ErrorMessage = strerror((int)ErrorCode);
-	if (ErrorMessage == nullptr || !MBSToWCSString((const uint8_t *)ErrorMessage, strnlen(ErrorMessage, FILE_BUFFER_SIZE), InnerMessage))
+	if (ErrorMessage == nullptr || !MBS_To_WCS_String((const uint8_t *)ErrorMessage, strnlen(ErrorMessage, FILE_BUFFER_SIZE), InnerMessage))
 	{
 		Message.append(L"%d");
 	}
@@ -435,7 +438,7 @@ void ReadTextPrintLog(
 		{
 			PrintError(LOG_LEVEL_2, LOG_ERROR_IPFILTER, L"Data of a line is too short", 0, FileList_IPFilter.at(FileIndex).FileName.c_str(), Line);
 		}break;
-		case READ_TEXT_PARAMETER: //ReadParameter
+		case READ_TEXT_PARAMETER_NORMAL: //ReadParameter
 		{
 			PrintError(LOG_LEVEL_2, LOG_ERROR_PARAMETER, L"Data of a line is too short", 0, FileList_Config.at(FileIndex).FileName.c_str(), Line);
 		}break;

@@ -17,7 +17,14 @@
 // Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
+#ifndef PCAP_DNSPROXY_STRUCTURE_H
+#define PCAP_DNSPROXY_STRUCTURE_H
+
 #include "Platform.h"
+
+//Memory alignment settings
+#pragma pack(push) //Push current alignment to stack.
+#pragma pack(1) //Set alignment to 1 byte boundary.
 
 //////////////////////////////////////////////////
 // Protocol Header structures
@@ -147,7 +154,7 @@ typedef struct _ppp_hdr_
 }ppp_hdr, *pppp_hdr;
 
 //Internet Protocol Numbers
-//About this list, see IANA Assigned Internet Protocol Numbers(https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml)
+//About this list, visit IANA Assigned Internet Protocol Numbers(https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml)
 #ifndef IPPROTO_HOPOPTS
 	#define IPPROTO_HOPOPTS           0                    //IPv6 Hop-by-Hop Option
 #endif
@@ -752,11 +759,11 @@ typedef struct _icmp_hdr_
 	uint16_t               Checksum;
 	uint16_t               ID;
 	uint16_t               Sequence;
-//ICMP Timestamp option is defalut enable in Linux and Mac OS X/macOS.
+//ICMP Timestamp option is defalut enable in Linux and macOS.
 #if defined(PLATFORM_LINUX)
 	uint64_t               Timestamp;
 	uint64_t               Nonce;
-#elif defined(PLATFORM_MACX)
+#elif defined(PLATFORM_MACOS)
 	uint64_t               Timestamp;
 #endif
 }icmp_hdr, *picmp_hdr;
@@ -786,11 +793,11 @@ typedef struct _icmpv6_hdr_
 	uint16_t               Checksum;
 	uint16_t               ID;
 	uint16_t               Sequence;
-//ICMPv6 Timestamp option is defalut enable in Linux and Mac OS X/macOS.
+//ICMPv6 Timestamp option is defalut enable in Linux and macOS.
 #if defined(PLATFORM_LINUX)
 	uint64_t               Timestamp;
 	uint64_t               Nonce;
-#elif defined(PLATFORM_MACX)
+#elif defined(PLATFORM_MACOS)
 	uint64_t               Timestamp;
 #endif
 }icmpv6_hdr, *picmpv6_hdr;
@@ -847,7 +854,7 @@ typedef struct _icmpv6_hdr_
 #define TCP_STATUS_PSH_ACK    0x0018   //TCP status: PSH, ACK
 
 //Port definitions(1 - 1024, well-known ports)
-//About this list, see IANA Service Name and Transport Protocol Port Number Registry(https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml)
+//About this list, visit IANA Service Name and Transport Protocol Port Number Registry(https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml)
 #ifndef IPPORT_TCPMUX
 	#define IPPORT_TCPMUX               1U
 #endif
@@ -1100,6 +1107,9 @@ typedef struct _icmpv6_hdr_
 #ifndef IPPORT_AODV
 	#define IPPORT_AODV                 654U
 #endif
+#ifndef IPPORT_DNS_TLS
+	#define IPPORT_DNS_TLS              853U
+#endif
 #ifndef IPPORT_FTPSDATA
 	#define IPPORT_FTPSDATA             989U
 #endif
@@ -1309,7 +1319,7 @@ typedef struct _ipv6_psd_hdr_
 * RFC 7314, Extension Mechanisms for DNS (EDNS) EXPIRE Option(https://tools.ietf.org/html/rfc7314)
 */
 
-//About this list, see IANA Domain Name System (DNS) Parameters(https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml)
+//About this list, visit IANA Domain Name System (DNS) Parameters(https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml)
 //Port and Flags definitions
 #ifndef IPPORT_DNS
 	#define IPPORT_DNS                    53U        //Standard DNS(TCP and UDP) Port
@@ -2137,7 +2147,7 @@ typedef struct _dns_record_opt_
 }dns_record_opt, *pdns_record_opt, edns_header, *pedns_header;
 
 /* Extension Mechanisms for Domain Name System/DNS, Client subnet in EDNS requests
-* Client Subnet in DNS Requests draft-vandergaast-edns-client-subnet-02(https://tools.ietf.org/html/draft-ietf-dnsop-edns-client-subnet-08)
+* RFC 7871, Client Subnet in DNS Queries(https://tools.ietf.org/html/rfc7871)
 
                     1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3 3
 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2
@@ -2152,19 +2162,23 @@ typedef struct _dns_record_opt_
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 */
-#define EDNS_CODE_LLQ                 0x0001   //Long-lived query
-#define EDNS_CODE_UL                  0x0002   //Update lease
-#define EDNS_CODE_NSID                0x0003   //Name Server Identifier (RFC 5001)
-#define EDNS_CODE_OWNER               0x0004   //Owner, reserved
-#define EDNS_CODE_DAU                 0x0005   //DNSSEC Algorithm Understood (RFC 6975)
-#define EDNS_CODE_DHU                 0x0006   //DS Hash Understood (RFC 6975)
-#define EDNS_CODE_N3U                 0x0007   //DSEC3 Hash Understood (RFC 6975)
-#define EDNS_CODE_CSUBNET             0x0008   //Client subnet as assigned by IANA
-#define EDNS_CODE_EDNS_EXPIRE         0x0009   //EDNS Expire (RFC 7314)
+#define EDNS_CODE_LLQ                            0x0001   //Long-lived query
+#define EDNS_CODE_UL                             0x0002   //Update lease
+#define EDNS_CODE_NSID                           0x0003   //Name Server Identifier (RFC 5001)
+#define EDNS_CODE_OWNER                          0x0004   //Owner, reserved
+#define EDNS_CODE_DAU                            0x0005   //DNSSEC Algorithm Understood (RFC 6975)
+#define EDNS_CODE_DHU                            0x0006   //DS Hash Understood (RFC 6975)
+#define EDNS_CODE_N3U                            0x0007   //DSEC3 Hash Understood (RFC 6975)
+#define EDNS_CODE_CSUBNET                        0x0008   //Client subnet as assigned by IANA
+#define EDNS_CODE_EDNS_EXPIRE                    0x0009   //EDNS Expire (RFC 7314)
 
-//About Address Family Numbers, see https://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml.
-#define ADDRESS_FAMILY_IPV4           0x0001
-#define ADDRESS_FAMILY_IPV6           0x0002
+//About Address Family Numbers, visit https://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml.
+#define ADDRESS_FAMILY_IPV4                      0x0001
+#define ADDRESS_FAMILY_IPV6                      0x0002
+
+//Netmask Source bits
+#define EDNS_CLIENT_SUBNET_NETMASK_SOURCE_IPV6   56U
+#define EDNS_CLIENT_SUBNET_NETMASK_SOURCE_IPV4   24U
 typedef struct _edns_client_subnet_
 {
 	uint16_t              Code;
@@ -2194,7 +2208,7 @@ typedef struct _edns_client_subnet_
 #define DNSSEC_DS_DIGEST_GOST                  3U       //RFC 5933, Use of GOST Signature Algorithms in DNSKEY and RRSIG Resource Records for DNSSEC(https://tools.ietf.org/html/rfc5933)
 #define DNSSEC_DS_DIGEST_SHA384                4U       //RFC 6605, Elliptic Curve Digital Signature Algorithm (DSA) for DNSSEC(https://tools.ietf.org/html/rfc6605)
 
-//About this list, see https://www.iana.org/assignments/ds-rr-types/ds-rr-types.xhtml
+//About this list, visit https://www.iana.org/assignments/ds-rr-types/ds-rr-types.xhtml
 #define DNSSEC_DS_TYPE_RESERVED                0
 #define DNSSEC_DS_TYPE_SHA1                    1U
 #define DNSSEC_DS_TYPE_SHA256                  2U
@@ -2355,7 +2369,7 @@ typedef struct _dns_record_nsec_
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 */
-//About this list, see IANA Domain Name System Security (DNSSEC) NextSECure3 (NSEC3) Parameters(https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml)
+//About this list, visit IANA Domain Name System Security (DNSSEC) NextSECure3 (NSEC3) Parameters(https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml)
 #define DNSSEC_NSEC3_ALGORITHM_SHA1            1U
 typedef struct _dns_record_nsec3_
 {
@@ -2392,7 +2406,7 @@ typedef struct _dns_record_nsec3_
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 */
-//About this list, see IANA Domain Name System Security (DNSSEC) NextSECure3 (NSEC3) Parameters(https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml)
+//About this list, visit IANA Domain Name System Security (DNSSEC) NextSECure3 (NSEC3) Parameters(https://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml)
 typedef struct _dns_record_nsec3param_
 {
 	uint8_t               Algorithm;
@@ -2530,8 +2544,8 @@ typedef struct _dnscurve_txt_signature_
 /* About RFC standards
 * RFC 1928, SOCKS Protocol Version 5(https://tools.ietf.org/html/rfc1928)
 * RFC 1929, Username/Password Authentication for SOCKS V5(https://tools.ietf.org/html/rfc1929)
-* SOCKS(version 4): A protocol for TCP proxy across firewalls(http://www.openssh.com/txt/socks4.protocol)
-* SOCKS 4A: A Simple Extension to SOCKS 4 Protocol(http://www.openssh.com/txt/socks4a.protocol)
+* SOCKS(version 4): A protocol for TCP proxy across firewalls(https://www.openssh.com/txt/socks4.protocol)
+* SOCKS 4A: A Simple Extension to SOCKS 4 Protocol(https://www.openssh.com/txt/socks4a.protocol)
 */
 //Version, Method, Command and Reply definitions
 #define SOCKS_VERSION_4                            4U
@@ -2773,4 +2787,8 @@ typedef struct _tls_base_record_
 	uint16_t              Version;
 	uint16_t              Length;
 }tls_base_record, *ptls_base_record;
+#endif
+
+//Memory alignment(Part 2)
+#pragma pack(pop) //Restore original alignment from stack.
 #endif

@@ -46,7 +46,7 @@ bool CheckEmptyBuffer(
 }
 
 //Convert multiple bytes to wide char string
-bool MBSToWCSString(
+bool MBS_To_WCS_String(
 	const uint8_t * const Buffer, 
 	const size_t MaxLen, 
 	std::wstring &Target)
@@ -55,7 +55,7 @@ bool MBSToWCSString(
 	Target.clear();
 	if (Buffer == nullptr || MaxLen == 0)
 		return false;
-	size_t Length = strnlen_s((const char *)Buffer, MaxLen);
+	auto Length = strnlen_s((const char *)Buffer, MaxLen);
 	if (Length == 0 || CheckEmptyBuffer(Buffer, Length))
 		return false;
 
@@ -70,7 +70,7 @@ bool MBSToWCSString(
 			MBSTOWCS_NULLTERMINATE, 
 			TargetPTR.get(), 
 			(int)(Length + PADDING_RESERVED_BYTES)) == 0)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	if (mbstowcs(TargetPTR.get(), (const char *)Buffer, Length + PADDING_RESERVED_BYTES) == (size_t)RETURN_ERROR)
 #endif
 	{
@@ -87,7 +87,7 @@ bool MBSToWCSString(
 }
 
 //Convert wide char string to multiple bytes
-bool WCSToMBSString(
+bool WCS_To_MBS_String(
 	const wchar_t * const Buffer, 
 	const size_t MaxLen, 
 	std::string &Target)
@@ -96,7 +96,7 @@ bool WCSToMBSString(
 	Target.clear();
 	if (Buffer == nullptr || MaxLen == 0)
 		return false;
-	size_t Length = wcsnlen_s(Buffer, MaxLen);
+	auto Length = wcsnlen_s(Buffer, MaxLen);
 	if (Length == 0 || CheckEmptyBuffer(Buffer, sizeof(wchar_t) * Length))
 		return false;
 
@@ -113,7 +113,7 @@ bool WCSToMBSString(
 			(int)(Length + PADDING_RESERVED_BYTES), 
 			nullptr, 
 			nullptr) == 0)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	if (wcstombs((char *)TargetPTR.get(), Buffer, Length + PADDING_RESERVED_BYTES) == (size_t)RETURN_ERROR)
 #endif
 	{
@@ -136,7 +136,7 @@ void CaseConvert(
 	const bool IsLowerToUpper)
 {
 //Null pointer
-	if (Buffer == nullptr)
+	if (Buffer == nullptr || Length == 0)
 	{
 		return;
 	}
@@ -197,7 +197,7 @@ void MakeStringReversed(
 	std::string &String)
 {
 //String check
-	if (String.size() <= 1U)
+	if (String.length() <= 1U)
 		return;
 
 //Make string reversed
@@ -217,7 +217,7 @@ void MakeStringReversed(
 	std::wstring &String)
 {
 //String check
-	if (String.size() <= 1U)
+	if (String.length() <= 1U)
 		return;
 
 //Make string reversed
@@ -237,12 +237,7 @@ bool CompareStringReversed(
 	const std::string &RuleItem, 
 	const std::string &TestItem)
 {
-//Length check
-	if (RuleItem.empty() || TestItem.empty() || TestItem.length() < RuleItem.length())
-		return false;
-
-//Compare each other.
-	else if (memcmp(RuleItem.c_str(), TestItem.c_str(), RuleItem.length()) == 0)
+	if (!RuleItem.empty() && !TestItem.empty() && TestItem.length() >= RuleItem.length() && memcmp(RuleItem.c_str(), TestItem.c_str(), RuleItem.length()) == 0)
 		return true;
 
 	return false;
@@ -251,8 +246,7 @@ bool CompareStringReversed(
 //Reversed string comparing
 bool CompareStringReversed(
 	const wchar_t * const RuleItem, 
-	const wchar_t * const TestItem, 
-	const bool IsCaseConvert)
+	const wchar_t * const TestItem)
 {
 	std::wstring InnerRuleItem(RuleItem), InnerTestItem(TestItem);
 
@@ -263,11 +257,6 @@ bool CompareStringReversed(
 	}
 	else {
 	//Make string reversed to compare.
-		if (IsCaseConvert)
-		{
-			CaseConvert(InnerRuleItem, false);
-			CaseConvert(InnerTestItem, false);
-		}
 		MakeStringReversed(InnerRuleItem);
 		MakeStringReversed(InnerTestItem);
 
@@ -304,6 +293,8 @@ size_t Base64_Encode(
 	const size_t OutputSize)
 {
 //Initialization
+	if (Length == 0)
+		return 0;
 	size_t Index[]{0, 0, 0};
 	memset(Output, 0, OutputSize);
 
@@ -351,7 +342,8 @@ size_t Base64_Encode(
 	return strnlen_s((const char *)Output, OutputSize);
 }
 
-/* Base64 decoding
+//Base64 decoding
+//Base64 encoding or decoding is from https://github.com/zhicheng/base64.
 size_t Base64_Decode(
 	uint8_t *Input, 
 	const size_t Length, 
@@ -359,20 +351,21 @@ size_t Base64_Decode(
 	const size_t OutputSize)
 {
 //Initialization
-	memset(Output, 0, OutputSize);
+	if (Length == 0)
+		return 0;
 	size_t Index[]{0, 0, 0};
 	int StringIter = 0;
+	memset(Output, 0, OutputSize);
 
 //Convert from Base64 to binary.
 	for (Index[0] = Index[1U] = 0;Index[0] < Length;++Index[0])
 	{
-	//From 6/gcd(6, 8)
 		StringIter = 0;
 		Index[2U] = Index[0] % 4U;
 		if (Input[Index[0]] == (uint8_t)BASE64_PAD)
-			return strnlen_s(Output, OutputSize);
-		if (Input[Index[0]] < BASE64_DE_FIRST || Input[Index[0]] > BASE64_DE_LAST || 
-			(StringIter = GlobalRunningStatus.Base64_DecodeTable[Input[Index[0]] - BASE64_DE_FIRST]) == -1)
+			return strnlen_s((const char *)Output, OutputSize);
+		if (Input[Index[0]] < BASE64_DECODE_FIRST || Input[Index[0]] > BASE64_DECODE_LAST || 
+			(StringIter = GlobalRunningStatus.Base64_DecodeTable[Input[Index[0]] - BASE64_DECODE_FIRST]) == -1)
 				return 0;
 		switch (Index[2U])
 		{
@@ -406,10 +399,10 @@ size_t Base64_Decode(
 		}
 	}
 
-	return strnlen_s(Output, OutputSize);
+	return strnlen_s((const char *)Output, OutputSize);
 }
-*/
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACX))
+
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //Increase time with milliseconds
 uint64_t IncreaseMillisecondTime(
 	const uint64_t CurrentTime, 
