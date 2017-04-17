@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
-// A local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2016 Chengr28
+// Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
+// Copyright (C) 2012-2017 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -61,6 +61,9 @@ extern GLOBAL_STATUS GlobalRunningStatus;
 extern DNSCURVE_CONFIGURATION_TABLE DNSCurveParameter, DNSCurveParameterModificating;
 #endif
 extern std::vector<FILE_DATA> FileList_Config, FileList_IPFilter, FileList_Hosts;
+#if defined(ENABLE_LIBSODIUM)
+extern std::vector<FILE_DATA> FileList_DNSCurveDatabase;
+#endif
 extern std::vector<DIFFERNET_FILE_SET_IPFILTER> *IPFilterFileSetUsing, *IPFilterFileSetModificating;
 extern std::vector<DIFFERNET_FILE_SET_HOSTS> *HostsFileSetUsing, *HostsFileSetModificating;
 extern std::mutex IPFilterFileLock, HostsFileLock;
@@ -80,7 +83,7 @@ void GetParameterListData(
 	const size_t Length, 
 	const uint8_t SeparatedSign, 
 	const bool IsCaseConvert, 
-	const bool KeepEmptyItem);
+	const bool IsKeepEmptyItem);
 
 //Functions in ReadParameter.cpp
 bool Parameter_CheckSetting(
@@ -110,6 +113,7 @@ bool ReadMultipleAddresses(
 	std::string Data, 
 	const size_t DataOffset, 
 	std::vector<DNS_SERVER_DATA> * const DNSServerDataList, 
+	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
 bool Read_SOCKS_AddressDomain(
@@ -119,7 +123,7 @@ bool Read_SOCKS_AddressDomain(
 	const size_t FileIndex, 
 	const size_t Line);
 #if defined(ENABLE_PCAP)
-bool ReadHopLimitData(
+bool ReadHopLimitsData(
 	const uint16_t Protocol, 
 	std::string Data, 
 	const size_t DataOffset, 
@@ -129,16 +133,25 @@ bool ReadHopLimitData(
 	const size_t Line);
 #endif
 #if defined(ENABLE_LIBSODIUM)
+void ReadDNSCurveDatabaseData(
+	std::string Data, 
+	const READ_TEXT_TYPE InputType, 
+	const size_t FileIndex, 
+	const size_t Line);
+void ReadDNSCurveDatabaseItem(
+	const READ_TEXT_TYPE InputType);
 bool ReadDNSCurveProviderName(
 	std::string Data, 
 	const size_t DataOffset, 
 	uint8_t * const ProviderNameData, 
+//	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
 bool ReadDNSCurveKey(
 	std::string Data, 
 	const size_t DataOffset, 
 	uint8_t * const KeyData, 
+	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
 #endif

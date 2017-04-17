@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
-// A local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2016 Chengr28
+// Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
+// Copyright (C) 2012-2017 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -364,33 +364,34 @@
 #include <thread>                  //Thread support
 
 #if defined(PLATFORM_WIN)
-//LibSodium header
-	#ifndef ENABLE_LIBSODIUM
-		#define ENABLE_LIBSODIUM           //LibSodium always enable in Windows
-	#endif
-	#ifndef SODIUM_STATIC
-		#define SODIUM_STATIC              //LibSodium static linking always enable in Windows
-	#endif
-	#if defined(ENABLE_LIBSODIUM)
-		#include "..\\Dependency\\LibSodium\\sodium.h"
-	#endif
+//LibSodium header, always enabled(Windows)
+#ifndef ENABLE_LIBSODIUM
+	#define ENABLE_LIBSODIUM
+#endif
+#ifndef SODIUM_STATIC
+	#define SODIUM_STATIC
+#endif
+#if defined(ENABLE_LIBSODIUM)
+	#include "..\\Dependency\\LibSodium\\sodium.h"
+#endif
 
-//WinPcap header
-	#ifndef ENABLE_PCAP
-		#define ENABLE_PCAP                //WinPcap always enable in Windows
-	#endif
-	#ifndef WPCAP
-		#define WPCAP                      //WinPcap preprocessor definitions
-	#endif
-	#ifndef HAVE_REMOTE
-		#define HAVE_REMOTE                //WinPcap preprocessor definitions
-	#endif
-	#if defined(ENABLE_PCAP)
-		#include "..\\Dependency\\WinPcap\\pcap.h"
-	#endif
+//WinPcap header, always enabled(Windows)
+#ifndef ENABLE_PCAP
+	#define ENABLE_PCAP
+#endif
+#ifndef WPCAP
+	#define WPCAP                      //WinPcap preprocessor definitions
+#endif
+#ifndef HAVE_REMOTE
+	#define HAVE_REMOTE                //WinPcap preprocessor definitions
+#endif
+#if defined(ENABLE_PCAP)
+	#include "..\\Dependency\\WinPcap\\pcap.h"
+#endif
 
 //Windows API headers
 //Part 1 including files
+	#include <direct.h>                //Functions for directory handling and creation
 	#include <winsock2.h>              //WinSock 2.0+ support
 //	#include <winsvc.h>                //Service Control Manager
 
@@ -401,7 +402,7 @@
 	#include <ws2tcpip.h>              //WinSock 2.0+ Extension for TCP/IP protocols
 
 //Part 3 including files(MUST be including after Part 2)
-	#include <windows.h>               //Master include file in Windows
+	#include <windows.h>               //Master include file
 
 //Part 4 including files(MUST be including after Part 3)
 	#include <iphlpapi.h>              //IP Stack for MIB-II and related functionality
@@ -409,52 +410,52 @@
 //	#include <versionhelpers.h>        //Version Helper functions
 
 //Part 5 including files(MUST be including after Part 4)
-	#ifndef ENABLE_HTTP
-		#define ENABLE_HTTP                //WinINET always enable in Windows
-	#endif
-	#if defined(ENABLE_HTTP)
-		#include <wininet.h>               //Contains manifests, macros, types and prototypes for Microsoft Windows Internet Extensions
-	#endif
-	#ifndef ENABLE_TLS
-		#define ENABLE_TLS                 //SSPI always enable in Windows
-	#endif
-	#if defined(ENABLE_TLS)
-		#define SECURITY_WIN32
-		#include <schannel.h>              //Public Definitions for SCHANNEL Security Provider
-		#include <sspi.h>                  //Security Support Provider Interface
-	#endif
+#ifndef ENABLE_HTTP
+	#define ENABLE_HTTP                //WinINET, always enabled(Windows)
+#endif
+#if defined(ENABLE_HTTP)
+	#include <wininet.h>               //Contains manifests, macros, types and prototypes for Microsoft Windows Internet Extensions
+#endif
+#ifndef ENABLE_TLS
+	#define ENABLE_TLS                 //SSPI, always enabled(Windows)
+#endif
+#if defined(ENABLE_TLS)
+	#define SECURITY_WIN32
+	#include <schannel.h>              //Public Definitions for SCHANNEL Security Provider
+	#include <sspi.h>                  //Security Support Provider Interface
+#endif
 
 //Library linking
 	#pragma comment(lib, "iphlpapi.lib")   //Windows IP Helper, IP Stack for MIB-II and related functionality support
 	#pragma comment(lib, "ws2_32.lib")     //Windows WinSock 2.0+ support
-	#if defined(ENABLE_HTTP)
-		#pragma comment(lib, "wininet.lib")    //Contains manifests, macros, types and prototypes for Microsoft Windows Internet Extensions support
-	#endif
-	#if defined(ENABLE_TLS)
-		#pragma comment(lib, "secur32.lib")    //Security Support Provider Interface support
-	#endif
-	#if defined(PLATFORM_WIN64)
-		#if defined(ENABLE_LIBSODIUM)
-			#pragma comment(lib, "..\\Dependency\\LibSodium\\LibSodium_x64.lib")
-		#endif
-		#if defined(ENABLE_PCAP)
-			#pragma comment(lib, "..\\Dependency\\WinPcap\\WPCAP_x64.lib")
-			#pragma comment(lib, "..\\Dependency\\WinPcap\\Packet_x64.lib")
-		#endif
-	#elif defined(PLATFORM_WIN32)
-		#if defined(ENABLE_LIBSODIUM)
-			#pragma comment(lib, "..\\Dependency\\LibSodium\\LibSodium_x86.lib")
-		#endif
-		#if defined(ENABLE_PCAP)
-			#pragma comment(lib, "..\\Dependency\\WinPcap\\WPCAP_x86.lib")
-			#pragma comment(lib, "..\\Dependency\\WinPcap\\Packet_x86.lib")
-		#endif
-	#endif
+#if defined(ENABLE_HTTP)
+	#pragma comment(lib, "wininet.lib")    //Contains manifests, macros, types and prototypes for Microsoft Windows Internet Extensions support
+#endif
+#if defined(ENABLE_TLS)
+	#pragma comment(lib, "secur32.lib")    //Security Support Provider Interface support
+#endif
+#if defined(PLATFORM_WIN64)
+#if defined(ENABLE_LIBSODIUM)
+	#pragma comment(lib, "..\\Dependency\\LibSodium\\LibSodium_x64.lib")
+#endif
+#if defined(ENABLE_PCAP)
+	#pragma comment(lib, "..\\Dependency\\WinPcap\\WPCAP_x64.lib")
+	#pragma comment(lib, "..\\Dependency\\WinPcap\\Packet_x64.lib")
+#endif
+#elif defined(PLATFORM_WIN32)
+#if defined(ENABLE_LIBSODIUM)
+	#pragma comment(lib, "..\\Dependency\\LibSodium\\LibSodium_x86.lib")
+#endif
+#if defined(ENABLE_PCAP)
+	#pragma comment(lib, "..\\Dependency\\WinPcap\\WPCAP_x86.lib")
+	#pragma comment(lib, "..\\Dependency\\WinPcap\\Packet_x86.lib")
+#endif
+#endif
 
 //Endian definitions
 	#define __LITTLE_ENDIAN            1234                         //Little Endian
 	#define __BIG_ENDIAN               4321                         //Big Endian
-	#define __BYTE_ORDER               __LITTLE_ENDIAN              //x86 and x86-64/x64 is Little Endian in Windows.
+	#define __BYTE_ORDER               __LITTLE_ENDIAN              //x86 and x86-64/x64 is Little Endian.
 	#define LITTLE_ENDIAN              __LITTLE_ENDIAN
 	#define BIG_ENDIAN                 __BIG_ENDIAN
 	#define BYTE_ORDER                 __BYTE_ORDER
@@ -481,13 +482,13 @@
 	#include <cwchar>                      //Wide characters support
 
 //Portable Operating System Interface/POSIX and Unix system header
-	#if defined(PLATFORM_LINUX)
-		#include <endian.h>                    //Endian support
-	#elif defined(PLATFORM_MACOS)
-		#define __LITTLE_ENDIAN                1234                         //Little Endian
-		#define __BIG_ENDIAN                   4321                         //Big Endian
-		#define __BYTE_ORDER                   __LITTLE_ENDIAN              //x86 and x86-64/x64 is Little Endian in macOS.
-	#endif
+#if defined(PLATFORM_LINUX)
+	#include <endian.h>                    //Endian support
+#elif defined(PLATFORM_MACOS)
+	#define __LITTLE_ENDIAN                1234                         //Little Endian
+	#define __BIG_ENDIAN                   4321                         //Big Endian
+	#define __BYTE_ORDER                   __LITTLE_ENDIAN              //x86 and x86-64/x64 is Little Endian.
+#endif
 	#include <fcntl.h>                     //Manipulate file descriptor support
 	#include <ifaddrs.h>                   //Getting network interface addresses support
 	#include <netdb.h>                     //Network database operations support
@@ -495,103 +496,101 @@
 	#include <unistd.h>                    //Standard library API support
 	#include <arpa/inet.h>                 //Internet operations support
 	#include <netinet/tcp.h>               //TCP protocol support
+	#include <sys/file.h>                  //File descriptor support
 	#include <sys/socket.h>                //Socket support
 	#include <sys/stat.h>                  //Getting information about files attributes support
 	#include <sys/time.h>                  //Date and time support
 	#include <sys/types.h>                 //Types support
 
 //Dependency header
-	#if defined(PLATFORM_LINUX)
-	//LibSodium part
-		#if defined(ENABLE_LIBSODIUM)
-			#include <sodium.h>
-		#endif
+#if defined(PLATFORM_LINUX)
+//LibSodium part
+#if defined(ENABLE_LIBSODIUM)
+	#include <sodium.h>
+#endif
 
-	//LibPcap part
-		#if defined(ENABLE_PCAP)
-			#include <pcap/pcap.h>
-		#endif
+//LibPcap part
+#if defined(ENABLE_PCAP)
+	#include <pcap/pcap.h>
+#endif
 
-	//OpenSSL part
-		#if defined(ENABLE_TLS)
-			#include <openssl/bio.h>
-			#include <openssl/conf.h>
-			#include <openssl/err.h>
-			#include <openssl/ssl.h>
-			#include <openssl/x509v3.h>
-		#endif
-	#elif defined(PLATFORM_MACOS)
-	//LibSodium part
-		#if defined(PLATFORM_MACOS_XCODE)
-			#ifndef ENABLE_LIBSODIUM
-				#define ENABLE_LIBSODIUM
-			#endif
-			#ifndef SODIUM_STATIC
-				#define SODIUM_STATIC
-			#endif
-			#include "../Dependency/LibSodium/sodium.h"
-			#pragma comment(lib, "../Dependency/LibSodium/LibSodium_macOS.a")
-		#else
-			#if defined(ENABLE_LIBSODIUM)
-				#ifndef SODIUM_STATIC
-					#define SODIUM_STATIC
-				#endif
-				#include <sodium.h>
-			#endif
-		#endif
+//OpenSSL part
+#if defined(ENABLE_TLS)
+	#include <openssl/bio.h>
+	#include <openssl/conf.h>
+	#include <openssl/err.h>
+	#include <openssl/ssl.h>
+	#include <openssl/x509v3.h>
+#endif
+#elif defined(PLATFORM_MACOS)
+//LibSodium part
+#if defined(PLATFORM_MACOS_XCODE)
+#ifndef ENABLE_LIBSODIUM
+	#define ENABLE_LIBSODIUM
+#endif
+#ifndef SODIUM_STATIC
+	#define SODIUM_STATIC
+#endif
+	#include "../Dependency/LibSodium/sodium.h"
+	#pragma comment(lib, "../Dependency/LibSodium/LibSodium_macOS.a")
+#else
+#if defined(ENABLE_LIBSODIUM)
+#ifndef SODIUM_STATIC
+	#define SODIUM_STATIC
+#endif
+	#include <sodium.h>
+#endif
+#endif
 
-	//LibPcap part
-		#if defined(PLATFORM_MACOS_XCODE)
-			#ifndef ENABLE_PCAP
-				#define ENABLE_PCAP
-			#endif
-		#endif
-		#if defined(ENABLE_PCAP)
-			#include <pcap/pcap.h>
-		#endif
+//LibPcap part
+#if defined(PLATFORM_MACOS_XCODE)
+#ifndef ENABLE_PCAP
+	#define ENABLE_PCAP
+#endif
+#endif
+#if defined(ENABLE_PCAP)
+	#include <pcap/pcap.h>
+#endif
 
-	//OpenSSL part
-		#if defined(PLATFORM_MACOS_XCODE)
-			#ifndef ENABLE_TLS
-				#define ENABLE_TLS
-			#endif
-			#include "../Dependency/OpenSSL/openssl/bio.h"
-			#include "../Dependency/OpenSSL/openssl/conf.h"
-			#include "../Dependency/OpenSSL/openssl/err.h"
-			#include "../Dependency/OpenSSL/openssl/ssl.h"
-			#include "../Dependency/OpenSSL/openssl/x509v3.h"
-			#pragma comment(lib, "../Dependency/OpenSSL/LibCrypto_macOS.a")
-			#pragma comment(lib, "../Dependency/OpenSSL/LibSSL_macOS.a")
-		#else
-			#if defined(ENABLE_TLS)
-				#include <openssl/bio.h>
-				#include <openssl/conf.h>
-				#include <openssl/err.h>
-				#include <openssl/ssl.h>
-				#include <openssl/x509v3.h>
-			#endif
-		#endif
-	#endif
+//OpenSSL part
+#if defined(PLATFORM_MACOS_XCODE)
+#ifndef ENABLE_TLS
+	#define ENABLE_TLS
+#endif
+	#include "../Dependency/OpenSSL/openssl/bio.h"
+	#include "../Dependency/OpenSSL/openssl/conf.h"
+	#include "../Dependency/OpenSSL/openssl/err.h"
+	#include "../Dependency/OpenSSL/openssl/ssl.h"
+	#include "../Dependency/OpenSSL/openssl/x509v3.h"
+	#pragma comment(lib, "../Dependency/OpenSSL/LibCrypto_macOS.a")
+	#pragma comment(lib, "../Dependency/OpenSSL/LibSSL_macOS.a")
+#else
+#if defined(ENABLE_TLS)
+	#include <openssl/bio.h>
+	#include <openssl/conf.h>
+	#include <openssl/err.h>
+	#include <openssl/ssl.h>
+	#include <openssl/x509v3.h>
+#endif
+#endif
+#endif
 
 //TCP Fast Open support
-	#if defined(PLATFORM_LINUX)
-		#ifndef _KERNEL_FASTOPEN
-			#define _KERNEL_FASTOPEN
+#if defined(PLATFORM_LINUX)
+#ifndef _KERNEL_FASTOPEN
+	#define _KERNEL_FASTOPEN
 
-		//Conditional define for TCP_FASTOPEN
-			#ifndef TCP_FASTOPEN
-				#define TCP_FASTOPEN       23
-			#endif
+//Conditional define for TCP_FASTOPEN
+#ifndef TCP_FASTOPEN
+	#define TCP_FASTOPEN       23
+#endif
 
-		//Conditional define for MSG_FASTOPEN
-			#ifndef MSG_FASTOPEN
-				#define MSG_FASTOPEN       0x20000000
-			#endif
-		#endif
-
-	//A hint value for the Linux Kernel with TCP Fast Open
-		#define TCP_FASTOPEN_HINT      5
-	#endif
+//Conditional define for MSG_FASTOPEN
+#ifndef MSG_FASTOPEN
+	#define MSG_FASTOPEN       0x20000000
+#endif
+#endif
+#endif
 
 //Linux and macOS compatible definitions(Part 2)
 	#define FALSE                    0
@@ -599,7 +598,6 @@
 	#define SOCKET_ERROR             (-1)
 	#define TRUE                     1U
 	#define RETURN_ERROR             (-1)
-	#define MAX_PATH                 PATH_MAX
 	#define SD_BOTH                  SHUT_RDWR
 	#define SD_RECV                  SHUT_RD
 	#define SD_SEND                  SHUT_WR
@@ -608,25 +606,19 @@
 	#define WSAENETUNREACH           ENETUNREACH
 	#define WSAENOTSOCK              ENOTSOCK
 	#define WSAETIMEDOUT             ETIMEDOUT
-	typedef sockaddr                 *PSOCKADDR;
-	typedef sockaddr_in              *PSOCKADDR_IN;
-	typedef sockaddr_in6             *PSOCKADDR_IN6;
 
 //Function definitions(Part 1)
 	#define closesocket                                                  close
-	#if defined(PLATFORM_LINUX)
-		#define _fcloseall                                                   fcloseall
-	#endif
 	#define fwprintf_s                                                   fwprintf
 	#define strnlen_s                                                    strnlen
 	#define vfwprintf_s                                                  vfwprintf
 	#define wcsnlen_s                                                    wcsnlen
 	#define WSAGetLastError()                                            errno
 	#define _set_errno(Value)                                            errno = (Value)
-	#define fread_s(Dst, DstSize, ElementSize, Count, File)              fread(Dst, ElementSize, Count, File)
-	#define memcpy_s(Dst, DstSize, Src, Size)                            memcpy(Dst, Src, Size)
-	#define memmove_s(Dst, DstSize, Src, Size)                           memmove(Dst, Src, Size)
-	#define strncpy_s(Dst, DstSize, Src, Size)                           strncpy(Dst, Src, Size)
-	#define wcsncpy_s(Dst, DstSize, Src, Size)                           wcsncpy(Dst, Src, Size)
+	#define fread_s(Dst, DstSize, ElementSize, Count, File)              fread((Dst), (ElementSize), (Count), (File))
+	#define memcpy_s(Dst, DstSize, Src, Size)                            memcpy((Dst), (Src), (Size))
+	#define memmove_s(Dst, DstSize, Src, Size)                           memmove((Dst), (Src), (Size))
+	#define strncpy_s(Dst, DstSize, Src, Size)                           strncpy((Dst), (Src), (Size))
+	#define wcsncpy_s(Dst, DstSize, Src, Size)                           wcsncpy((Dst), (Src), (Size))
 #endif
 #endif

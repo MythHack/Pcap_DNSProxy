@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
-// A local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2016 Chengr28
+// Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
+// Copyright (C) 2012-2017 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,6 +26,9 @@
 extern CONFIGURATION_TABLE Parameter;
 extern GLOBAL_STATUS GlobalRunningStatus;
 extern std::vector<FILE_DATA> FileList_Config, FileList_IPFilter, FileList_Hosts;
+#if defined(ENABLE_LIBSODIUM)
+extern std::vector<FILE_DATA> FileList_DNSCurveDatabase;
+#endif
 extern std::mutex ScreenLock;
 std::mutex ErrorLogLock;
 

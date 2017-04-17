@@ -19,7 +19,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
   * Windows 版本的 Pcap_DNSProxy 在二進位可執行檔包的 Windows 目錄內，可將整個目錄單獨抽出運行
 
 3.打開下載回來的二進位可執行檔包，將 Windows 目錄解壓到磁片的任意位置
-  * 目錄所在位置和程式檔案名可以隨意更改
+  * 目錄所在位置和程式檔案名可以隨意更改，建議將本專案放置在一個獨立的目錄內
   * 設定檔需要使用固定的檔案名（更多詳細情況參見下文 功能和技術 一節）
 
 4.確定工具目錄的名稱和路徑後進入目錄內，右鍵以管理員身份(Vista 以及更新版本)或直接以管理員登錄按兩下(XP/2003)運行 ServiceControl.bat
@@ -120,7 +120,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
   * 強烈建議打開 DNS 緩存功能！
 * 本工具配置選項豐富，配置不同的組合會有不同的效果，介紹幾個比較常用的組合：
   * 預設配置：UDP 請求 + 抓包模式
-  * Output Protocol = ...TCP：先 TCP 請求失敗後再 UDP 請求 + 抓包模式，對網路資源的佔用比較高
+  * Outgoing Protocol = ...TCP：先 TCP 請求失敗後再 UDP 請求 + 抓包模式，對網路資源的佔用比較高
     * 由於 TCP 請求大部分時候不會被投毒污染，此組合的過濾效果比較可靠
   * EDNS Label = 1：開啟 EDNS 請求標籤功能
     * 此功能開啟後將有利於對偽造資料包的過濾能力，此組合的過濾效果比較可靠
@@ -161,9 +161,9 @@ https://sourceforge.net/projects/pcap-dnsproxy
   * Windows: Config.ini > Config.conf > Config.cfg > Config
   * Linux/macOS: Config.conf > Config.ini > Config.cfg > Config
 * 請求功能變數名稱解析優先順序
-  * 使用系統 API 函數進行功能變數名稱解析（大部分）：系統 Hosts > Pcap_DNSProxy 的 Hosts 條目（Whitelist/白名單條目 > Hosts/主要Hosts清單） > DNS緩存 > Local Hosts/境內 DNS 解析功能變數名稱清單 > 遠端DNS伺服器
-  * 直接從網路介面卡設置內讀取 DNS 伺服器位址進行功能變數名稱解析（小部分）：Pcap_DNSProxy 的 Hosts 配置檔案（Whitelist/白名單條目 > Hosts/主要Hosts清單） > DNS緩存 > Local Hosts/境內 DNS 解析功能變數名稱清單 > 遠端 DNS 伺服器
-  * 請求遠端 DNS 伺服器的優先順序：Direct Request 模式 > TCP 模式的 DNSCurve 加密/非加密模式（如有） > UDP 模式的 DNSCurve 加密/非加密模式（如有） > TCP模式普通請求（如有） > UDP模式普通請求
+  * 使用系統 API 函數進行功能變數名稱解析（大部分）：系統 Hosts > Pcap_DNSProxy 的 Hosts 條目（Whitelist/白名單條目 > Hosts/主要 Hosts 清單） > DNS 緩存 > Local Hosts/境內 DNS 解析功能變數名稱清單 > 遠端DNS伺服器
+  * 直接從網路介面卡設置內讀取 DNS 伺服器位址進行功能變數名稱解析（小部分）：Pcap_DNSProxy 的 Hosts 配置檔案（Whitelist/白名單條目 > Hosts/主要 Hosts 清單） > DNS緩存 > Local Hosts/境內 DNS 解析功能變數名稱清單 > 遠端 DNS 伺服器
+  * 請求遠端 DNS 伺服器的優先順序：Direct Request 模式 > TCP 模式的 DNSCurve 加密/非加密模式（如有） > UDP 模式的 DNSCurve 加密/非加密模式（如有） > TCP 模式普通請求（如有） > UDP 模式普通請求
 * 本工具的 DNSCurve/DNSCrypt 協定是內置的實現，不需要安裝 DNSCrypt 官方的工具！
   * DNSCurve 協定為 Streamlined/精簡類型
   * 自動獲取連接資訊時必須保證系統時間的正確，否則證書驗證時會出錯導致連接資訊獲取失敗！
@@ -208,10 +208,14 @@ https://sourceforge.net/projects/pcap-dnsproxy
 * Base - 基本參數區域
   * Version - 設定檔的版本，用於正確識別設定檔：本參數與程式版本號不相關，切勿修改
   * File Refresh Time - 檔刷新間隔時間：單位為秒，最小為 5
+    * 本參數同時決定監視器的時間休眠時間片的細微性，其指的是休眠一段長時間時會根據此細微性啟動並檢查是否需要重新運行特定監視專案，而不需要等到長時間完全過去休眠完全結束後才能重新對此進行監視，此功能對程式的網路狀況適應能力會有提高
   * Large Buffer Size - 大型資料緩衝區的固定長度：單位為位元組，最小為 1500
   * Additional Path - 附加的資料檔案讀取路徑，附加在此處的目錄路徑下的 Hosts 檔和 IPFilter 檔會被依次讀取：請填入目錄的絕對路徑
+    * 本參數支援同時讀取多個路徑，各路徑之間請使用 | 隔開
   * Hosts File Name - Hosts 檔的檔案名，附加在此處的 Hosts 檔案名將被依次讀取
+    * 本參數支援同時讀取多個檔案名，各路徑之間請使用 | 隔開
   * IPFilter File Name - IPFilter 檔的檔案名，附加在此處的 IPFilter 檔案名將被依次讀取
+    * 本參數支援同時讀取多個檔案名，各路徑之間請使用 | 隔開
 
 * Log - 日誌參數區域
   * Print Log Level - 指定日誌輸出級別：留空為 3
@@ -224,7 +228,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
 
 * Listen - 監聽參數區域
   * Pcap Capture - 抓包功能總開關，開啟後抓包模組才能正常使用：開啟為 1 /關閉為 0
-    * 注意：如果關閉抓包模組，需要開啟其它方式獲取功能變數名稱解析，否則會報錯！
+    * 注意：如果抓包模組被關閉，則會自動開啟 Direct Request 功能，啟用 Direct Request 時對 DNS 投毒污染的防禦能力比較弱
   * Pcap Devices Blacklist - 指定不對含有此名稱的網路介面卡進行抓包，名稱或簡介裡含有此字串的網路介面卡將被直接忽略
     * 本參數支援指定多個名稱，大小寫不敏感，格式為 "網路介面卡的名稱(|網路介面卡的名稱)"（不含引號，括弧內為可選項目）
     * 以抓包模組從系統中獲取的名稱或簡介為准，與其它網路設定程式所顯示的不一定相同
@@ -332,7 +336,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
     * RESERVED/65535
 
 * DNS - 功能變數名稱解析參數區域
-  * Output Protocol - 發送請求所使用的協定：可填入 IPv4 和 IPv6 和 TCP 和 UDP
+  * Outgoing Protocol - 發送請求所使用的協定：可填入 IPv4 和 IPv6 和 TCP 和 UDP
     * 填入的協定可隨意組合，只填 IPv4 或 IPv6 配合 UDP 或 TCP 時，只使用指定協定向遠端 DNS 伺服器發出請求
     * 同時填入 IPv4 和 IPv6 或直接不填任何網路層協定時，程式將根據網路環境自動選擇所使用的協定
     * 同時填入 TCP 和 UDP 等於只填入 TCP 因為 UDP 為 DNS 的標準網路層協定，所以即使填入 TCP 失敗時也會使用 UDP 請求
@@ -342,13 +346,26 @@ https://sourceforge.net/projects/pcap-dnsproxy
   * Cache Type - DNS 緩存的類型：分 Timer/計時型、Queue/佇列型以及它們的混合類型，填入 0 為關閉此功能
     * Timer/計時型：超過指定時間的 DNS 緩存將會被丟棄
     * Queue/佇列型：超過佇列長度時，將刪除最舊的 DNS 緩存
+    * 混合類型：超過指定時間時和超過佇列長度時，都會刪除最舊的 DNS 緩存
+  * Cache Type - DNS 緩存的類型：分 Timer/計時型、Queue/佇列型以及它們的混合類型，填入 0 為關閉此功能
+    * Timer/計時型：超過指定時間的 DNS 緩存將會被丟棄
+    * Queue/佇列型：超過佇列長度時，將刪除最舊的 DNS 緩存
     * 混合類型：超過指定時間時、超過佇列長度時以及超過功能變數名稱本身 TTL 時，都會刪除最舊的 DNS 緩存
   * Cache Parameter - DNS 緩存的參數：分 Timer/計時型、Queue/佇列型以及它們的混合類型，填入 0 為關閉此功能
-    * Timer/計時型：緩存時間，單位為秒
+    * Timer/計時型
+      * 緩存時間，單位為秒
+      * 如果解析結果的平均 TTL 值大於此值，則使用 [TTL + 此值] 為最終的緩存時間
+      * 如果解析結果的平均 TTL 值小於等於此值，則使用 [此值] 為最終的緩存時間
+      * 如果填 0 則最終的緩存時間為 TTL 值
     * Queue/佇列型：佇列長度
-    * 混合類型：佇列長度
+    * 混合類型
+      * 佇列長度
+      * 此模式下最終的緩存時間由 Default TTL 參數決定
   * Default TTL - 已緩存 DNS 記錄預設存留時間：單位為秒，留空則為 900秒/15分鐘
-    * DNS 緩存的類型為混合類型時，本參數將同時指定功能變數名稱本身 TTL 的最小緩存時間
+    * DNS 緩存的類型為混合類型時，本參數將同時決定最終的緩存時間
+      * 如果解析結果的平均 TTL 值大於此值，則使用 [TTL + 此值] 為最終的緩存時間
+      * 如果解析結果的平均 TTL 值小於等於此值，則使用 [此值] 為最終的緩存時間
+      * 如果填 0 則最終的緩存時間為 TTL 值
   
 * Local DNS - 境內功能變數名稱解析參數區域
   * Local Protocol - 發送境內請求所使用的協定：可填入 IPv4 和 IPv6 和 TCP 和 UDP
@@ -537,6 +554,21 @@ https://sourceforge.net/projects/pcap-dnsproxy
   * Unreliable Serial Socket Timeout - 串列可靠協定埠超時時間：單位為毫秒，最小為 500 可留空，留空時為 1000
     * 串列是指此操作需要多次交互網路傳輸才能完成，例如 SOCKS 和 HTTP CONNECT 協定
     * 不可靠埠指 UDP/ICMP/ICMPv6 協定
+  * TCP Fast Open - TCP 快速打開功能：
+    * 本功能的支援情況：
+      * Windows 平臺
+        * 開啟為 1 /關閉為 0
+        * 伺服器端支援，用戶端由於不同類型 I/O 的問題暫時無法進行支援
+        * 需要 Windows 10 Version 1607 以及更新版本的支援
+      * Linux 平臺：
+        * 此參數可同時指定支援 TCP Fast Open 監聽佇列長度，直接填入大於 0 的值即為佇列長度，關閉為 0
+        * 伺服器端和用戶端完全支援
+        * IPv4 協定需要 Linux Kernel 3.7 以及更新版本的支援，IPv6 協定需要 Linux Kernel 3.16 以及更新版本的內核支援
+      * macOS 平臺：
+        * 開啟為 1 /關閉為 0
+        * 伺服器端和用戶端完全支援
+        * 需要 macOS 10.11 Sierra 以及更新版本的支援
+    * 警告：切勿在不受支援的版本上開啟本功能，否則可能導致程式無法正常收發資料包！
   * Receive Waiting - 資料包接收等待時間，啟用後程式會嘗試等待一段時間以嘗試接收所有資料包並返回最後到達的資料包：單位為毫秒，留空或設置為 0 表示關閉此功能
     * 本參數與 Pcap Reading Timeout 密切相關，由於抓包模組每隔一段讀取超時時間才會返回給程式一次，當資料包接收等待時間小於讀取超時時間時會導致本參數變得沒有意義，在一些情況下甚至會拖慢功能變數名稱解析的回應速度
     * 本參數啟用後雖然本身只決定抓包模組的接收等待時間，但同時會影響到非抓包模組的請求。 非抓包模組會自動切換為等待超時時間後發回最後收到的回復，預設為接受最先到達的正確的回復，而它們的超時時間由 Reliable Once Socket Timeout/Unreliable Once Socket Timeout 參數決定
@@ -557,24 +589,15 @@ https://sourceforge.net/projects/pcap-dnsproxy
     * 使用多 TTL/Hop Limits 值所對應的順序與對應位址參數中的位址順序相同
 
 * Switches - 控制開關區域
-  * TCP Fast Open - TCP 快速打開功能：開啟為 1 /關閉為 0
-    * 目前本功能只支援 Linux 平臺，Windows 和 macOS 平臺將直接忽略此參數，其中：
-      * IPv4 需要 3.7 以及更新版本的內核支援
-      * IPv6 需要 3.16 以及更新版本的內核支援
-      * 警告：切勿在不受支援的內核版本上開啟本功能，否則可能導致程式無法正常收發資料包！
-    * 開啟系統對本功能的支援：
-      * 臨時支援：需要在擁有 ROOT 許可權的終端執行 echo 3 > /proc/sys/net/ipv4/tcp_fastopen
-      * 長期支援：
-        * 在 /etc/rc.local 檔最下面添加 echo 3 > /proc/sys/net/ipv4/tcp_fastopen 保存，以後每次啟動都將自動設置此值
-        * 在 /etc/sysctl.conf 檔中添加 net.ipv4.tcp_fastopen = 3 保存
   * Domain Case Conversion - 隨機轉換功能變數名稱請求大小寫：開啟為 1 /關閉為 0
   * Compression Pointer Mutation - 隨機添加壓縮指標：可填入 1 (+ 2 + 3)，關閉為 0 
     * 隨機添加壓縮指標有3種不同的類型，對應 1 和 2 和 3
     * 可單獨使用其中一個，即只填一個數位，或填入多個，中間使用 + 號連接
     * 填入多個時，當實際需要使用隨機添加壓縮指標時將隨機使用其中的一種，每個請求都有可能不相同
   * EDNS Label - EDNS 標籤支援，開啟後將為請求添加 EDNS 標籤：全部開啟為 1 /關閉為 0
-    * 本參數可只指定部分的請求過程使用 EDNS 標籤，以下可用的參數可隨意刪減以實現此功能
-    * 可用的參數：Local + SOCKS Proxy + HTTP CONNECT Proxy + Direct Request + DNSCurve + TCP + UDP
+    * 本參數可只指定部分的請求過程使用 EDNS 標籤，分為指定模式和排除模式：
+    * 指定清單模式，列出的過程才啟用此功能：EDNS Label = Local + SOCKS Proxy + HTTP CONNECT Proxy + Direct Request + DNSCurve + TCP + UDP
+    * 排除清單模式，列出的過程不啟用此功能：EDNS Label = 1 - Local - SOCKS Proxy - HTTP CONNECT Proxy - Direct Request - DNSCurve - TCP - UDP
   * EDNS Client Subnet Relay - EDNS 用戶端子網轉發功能，開啟後將為來自非私有網路位址的所有請求添加其請求時所使用的位址的 EDNS 子網位址：開啟為 1 /關閉為 0
     * 本功能要求啟用 EDNS Label 參數
     * 本參數優先順序比 IPv4/IPv6 EDNS Client Subnet Address 參數高，故需要添加 EDNS 子網位址時將優先添加本參數的位址
@@ -677,6 +700,17 @@ https://sourceforge.net/projects/pcap-dnsproxy
     * 注意：使用 "只使用加密模式" 時必須提供伺服器的魔數和指紋用於請求和接收
   * DNSCurve Client Ephemeral Key - 一次性用戶端金鑰組模式，每次請求解析均使用隨機生成的一次性用戶端金鑰組，提供前向安全性：開啟為 1 /關閉為 0
   * DNSCurve Key Recheck Time - DNSCurve 協定 DNS 伺服器連接資訊檢查間隔：單位為秒，最小為 10
+
+* DNSCurve Database - DNSCurve 協定資料庫區域
+  * DNSCurve Database Name - DNSCurve 協定資料庫的檔案名
+    * 不支援多個檔案名
+  * DNSCurve Database IPv4 Main DNS - DNSCurve 協定 IPv4 主要 DNS 伺服器位址：需要填入 DNSCurve 協定資料庫中對應伺服器的 Name 欄位
+  * DNSCurve Database IPv4 Alternate DNS - DNSCurve 協定 IPv4 備用 DNS 伺服器位址：需要填入 DNSCurve 協定資料庫中對應伺服器的 Name 欄位
+  * DNSCurve Database IPv6 Main DNS - DNSCurve 協定 IPv6 主要 DNS 伺服器位址：需要填入 DNSCurve 協定資料庫中對應伺服器的 Name 欄位
+  * DNSCurve Database IPv6 Alternate DNS - DNSCurve 協定 IPv6 備用 DNS 伺服器位址：需要填入 DNSCurve 協定資料庫中對應伺服器的 Name 欄位
+  * 注意：
+    * 啟用此部分功能後會覆蓋設定檔中所設置 DNSCurve 伺服器的相關配置！
+    * 當在多個附加路徑存在多個 DNSCurve 協定資料庫中存在同名 Name 欄位時，以最先被讀取的為准
 
 * DNSCurve Addresses - DNSCurve 協定位址區域
   * DNSCurve IPv4 Main DNS Address - DNSCurve 協定 IPv4 主要 DNS 伺服器位址：需要輸入一個帶埠格式的位址
