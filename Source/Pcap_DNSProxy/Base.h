@@ -73,6 +73,20 @@ size_t Base64_Decode(
 	const size_t Length, 
 	uint8_t *Output, 
 	const size_t OutputSize);
+HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
+	uint8_t *String, 
+	size_t ByteSize, 
+	size_t *Consumed, 
+	uint8_t *Buffer, 
+	size_t Length, 
+	size_t *Produced);
+HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
+	uint8_t *HuffmanBuffer, 
+	size_t ByteSize, 
+	size_t *Consumed, 
+	uint8_t *TargetBuffer, 
+	size_t Length, 
+	size_t *Produced);
 #if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 uint64_t IncreaseMillisecondTime(
 	const uint64_t CurrentTime, 
@@ -302,6 +316,9 @@ void ReadTextPrintLog(
 	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
+void HTTP_CONNECT_2_PrintLog(
+	const uint32_t ErrorCode, 
+	std::wstring &Message);
 #if defined(ENABLE_LIBSODIUM)
 void DNSCurvePrintLog(
 	const DNSCURVE_SERVER_TYPE ServerType, 
@@ -477,6 +494,7 @@ bool SSPI_Handshake(
 	std::vector<SOCKET_SELECTING_SERIAL_DATA> &SocketSelectingDataList, 
 	std::vector<ssize_t> &ErrorCodeList);
 bool TLS_TransportSerial(
+	const REQUEST_PROCESS_TYPE RequestType, 
 	const size_t PacketMinSize, 
 	SSPI_HANDLE_TABLE &SSPI_Handle, 
 	std::vector<SOCKET_DATA> &SocketDataList, 

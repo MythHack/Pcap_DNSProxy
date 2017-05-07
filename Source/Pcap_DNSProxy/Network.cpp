@@ -284,7 +284,7 @@ bool SocketSetting(
 			if (setsockopt(Socket, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char *>(&OptionValue), sizeof(OptionValue)) == SOCKET_ERROR)
 			{
 				if (IsPrintError)
-					PrintError(LOG_LEVEL_TYPE::LEVEL_2, LOG_ERROR_TYPE::NETWORK, L"Socket reusing disable setting error", WSAGetLastError(), nullptr, 0);
+					PrintError(LOG_LEVEL_TYPE::LEVEL_2, LOG_ERROR_TYPE::NETWORK, L"Socket reusing disabled setting error", WSAGetLastError(), nullptr, 0);
 				shutdown(Socket, SD_BOTH);
 				closesocket(Socket);
 
@@ -298,7 +298,7 @@ bool SocketSetting(
 			if (setsockopt(Socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&OptionValue), sizeof(OptionValue)) == SOCKET_ERROR)
 			{
 				if (IsPrintError)
-					PrintError(LOG_LEVEL_TYPE::LEVEL_2, LOG_ERROR_TYPE::NETWORK, L"Socket reusing enable setting error", errno, nullptr, 0);
+					PrintError(LOG_LEVEL_TYPE::LEVEL_2, LOG_ERROR_TYPE::NETWORK, L"Socket reusing enabled setting error", errno, nullptr, 0);
 				shutdown(Socket, SHUT_RDWR);
 				close(Socket);
 
@@ -1729,7 +1729,7 @@ ssize_t SelectingResultOnce(
 					}
 				}
 
-			//Mark sockets to global list.
+			//Mark to global list.
 				std::unique_lock<std::mutex> SocketMarkingMutex(SocketMarkingLock);
 				for (auto &SocketDataIter:SocketDataList)
 				{
@@ -1826,7 +1826,7 @@ ssize_t SelectingResultOnce(
 					memcpy_s(OriginalRecv, RecvSize, SocketSelectingList->at(Index).RecvBuffer.get(), RecvLen);
 				}
 
-			//Mark sockets to global list.
+			//Mark to global list.
 				std::unique_lock<std::mutex> SocketMarkingMutex(SocketMarkingLock);
 				for (auto &SocketDataIter:SocketDataList)
 				{
@@ -2030,6 +2030,10 @@ size_t SocketSelectingSerial(
 //Jump here to stop loop.
 StopLoop:
 
+//HTTP CONNECT shutdown connection is no need to receive anything.
+	if (RequestType == REQUEST_PROCESS_TYPE::HTTP_CONNECT_SHUTDOWN)
+		return EXIT_SUCCESS;
+
 //Socket check(Receive process)
 	for (auto SocketDataIter = SocketDataList.begin();SocketDataIter != SocketDataList.end();++SocketDataIter)
 	{
@@ -2097,7 +2101,7 @@ StopLoop:
 							SocketSelectingDataList.at(Index).RecvSize = Parameter.LargeBufferSize;
 							SocketSelectingDataList.at(Index).RecvLen = 0;
 						}
-						else if (SocketSelectingDataList.at(Index).RecvSize < SocketSelectingDataList.at(Index).RecvLen + Parameter.LargeBufferSize)
+						else if (SocketSelectingDataList.at(Index).RecvSize <= SocketSelectingDataList.at(Index).RecvLen + Parameter.LargeBufferSize)
 						{
 							std::unique_ptr<uint8_t[]> RecvBuffer(new uint8_t[SocketSelectingDataList.at(Index).RecvSize + Parameter.LargeBufferSize]);
 							memset(RecvBuffer.get(), 0, SocketSelectingDataList.at(Index).RecvSize + Parameter.LargeBufferSize);
