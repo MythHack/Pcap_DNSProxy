@@ -19,25 +19,25 @@
 
 #include "DNSCurve.h"
 
-/* DNSCurve/DNSCrypt Protocol version 2
+/* DNSCurve(DNSCrypt) Protocol version 2
 
 Client -> Server:
 *  8 bytes: Magic query bytes
 * 32 bytes: The client's DNSCurve public key (crypto_box_PUBLICKEYBYTES)
 * 12 bytes: A client-selected nonce for this packet (crypto_box_NONCEBYTES / 2)
 * 16 bytes: Poly1305 MAC (crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
-* Variable encryption data ...
+* Variable encryption data ..
 
 Server -> Client:
 *  8 bytes: The string "r6fnvWJ8" (DNSCRYPT_MAGIC_RESPONSE)
 * 12 bytes: The client's nonce (crypto_box_NONCEBYTES / 2)
 * 12 bytes: A server-selected nonce extension (crypto_box_NONCEBYTES / 2)
 * 16 bytes: Poly1305 MAC (crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
-* Variable encryption data ...
+* Variable encryption data ..
 
 Using TCP protocol:
-* 2 bytes: DNSCurve/DNSCrypt data payload length
-* Variable original DNSCurve/DNSCrypt data ...
+* 2 bytes: DNSCurve(DNSCrypt) data payload length
+* Variable original DNSCurve(DNSCrypt) data ..
 
 */
 
@@ -308,6 +308,7 @@ void DNSCurveSocketPrecomputation(
 	SOCKET_DATA SocketDataTemp;
 	DNSCURVE_SOCKET_SELECTING_TABLE SocketSelectingDataTemp;
 	memset(&SocketDataTemp, 0, sizeof(SocketDataTemp));
+	SocketDataTemp.Socket = INVALID_SOCKET;
 	std::vector<SOCKET_DATA> Alternate_SocketDataList;
 	std::vector<DNSCURVE_SOCKET_SELECTING_TABLE> Alternate_SocketSelectingList;
 	uint8_t Client_PublicKey_Buffer[crypto_box_PUBLICKEYBYTES]{0};
@@ -406,8 +407,8 @@ void DNSCurveSocketPrecomputation(
 	//Make encryption or normal packet of Main server.
 		if (DNSCurveParameter.IsEncryption || Protocol == IPPROTO_TCP)
 		{
-			std::unique_ptr<uint8_t[]> SendBufferTemp(new uint8_t[RecvSize]());
-			sodium_memzero(SendBufferTemp.get(), RecvSize);
+			std::unique_ptr<uint8_t[]> SendBufferTemp(new uint8_t[RecvSize + PADDING_RESERVED_BYTES]());
+			sodium_memzero(SendBufferTemp.get(), RecvSize + PADDING_RESERVED_BYTES);
 			std::swap(SendBuffer, SendBufferTemp);
 			DataLength = DNSCurvePacketEncryption(Protocol, (*PacketTarget)->SendMagicNumber, Client_PublicKey, *PrecomputationKey, OriginalSend, SendSize, SendBuffer.get(), RecvSize);
 			if (DataLength < DNS_PACKET_MINSIZE)
@@ -541,8 +542,8 @@ SkipMain:
 	//Make encryption or normal packet of Alternate server.
 		if (DNSCurveParameter.IsEncryption)
 		{
-			std::unique_ptr<uint8_t[]> SendBufferTemp(new uint8_t[RecvSize]());
-			sodium_memzero(SendBufferTemp.get(), RecvSize);
+			std::unique_ptr<uint8_t[]> SendBufferTemp(new uint8_t[RecvSize + PADDING_RESERVED_BYTES]());
+			sodium_memzero(SendBufferTemp.get(), RecvSize + PADDING_RESERVED_BYTES);
 			std::swap(Alternate_SendBuffer, SendBufferTemp);
 			SendBufferTemp.reset();
 			Alternate_DataLength = DNSCurvePacketEncryption(Protocol, (*PacketTarget)->SendMagicNumber, Client_PublicKey, *Alternate_PrecomputationKey, OriginalSend, SendSize, Alternate_SendBuffer.get(), RecvSize);
@@ -609,7 +610,7 @@ size_t DNSCurvePacketEncryption(
 		}
 
 	//Make a crypto box.
-		memcpy_s(Buffer.get() + crypto_box_ZEROBYTES, DNSCurveParameter.DNSCurvePayloadSize - crypto_box_ZEROBYTES, OriginalSend, Length);
+		memcpy_s(Buffer.get() + crypto_box_ZEROBYTES, DNSCurveParameter.DNSCurvePayloadSize - DNSCRYPT_BUFFER_RESERVED_LEN - crypto_box_ZEROBYTES, OriginalSend, Length);
 		DNSCurvePaddingData(true, Buffer.get(), crypto_box_ZEROBYTES + Length, DNSCurveParameter.DNSCurvePayloadSize - DNSCRYPT_BUFFER_RESERVED_LEN);
 
 	//Encrypt data.
@@ -645,7 +646,7 @@ size_t DNSCurvePacketEncryption(
 			memcpy_s(SendBuffer + sizeof(uint16_t) + DNSCURVE_MAGIC_QUERY_LEN, SendSize - sizeof(uint16_t) - DNSCURVE_MAGIC_QUERY_LEN, Client_PublicKey, crypto_box_PUBLICKEYBYTES);
 			memcpy_s(SendBuffer + sizeof(uint16_t) + DNSCURVE_MAGIC_QUERY_LEN + crypto_box_PUBLICKEYBYTES, SendSize - sizeof(uint16_t) - DNSCURVE_MAGIC_QUERY_LEN - crypto_box_PUBLICKEYBYTES, Nonce, crypto_box_HALF_NONCEBYTES);
 
-		//Add length of request packet(It must be written in header when transport with TCP protocol).
+		//Add length of request packet.
 			*reinterpret_cast<uint16_t *>(SendBuffer) = htons(static_cast<uint16_t>(DNSCurveParameter.DNSCurvePayloadSize - sizeof(uint16_t)));
 		}
 		else if (Protocol == IPPROTO_UDP)
@@ -664,7 +665,7 @@ size_t DNSCurvePacketEncryption(
 	else {
 		memcpy_s(SendBuffer, SendSize, OriginalSend, Length);
 
-	//Add length of request packet(It must be written in header when transport with TCP protocol).
+	//Add length of request packet.
 		if (Protocol == IPPROTO_TCP)
 			return AddLengthDataToHeader(SendBuffer, Length, SendSize);
 		else if (Protocol == IPPROTO_UDP)
@@ -736,7 +737,7 @@ bool DNSCruveGetSignatureData(
 	if (ntohs((reinterpret_cast<const dns_record_txt *>(Buffer))->Name) == DNS_POINTER_QUERY && 
 		ntohs((reinterpret_cast<const dns_record_txt *>(Buffer))->Length) == (reinterpret_cast<const dns_record_txt *>(Buffer))->TXT_Length + NULL_TERMINATE_LENGTH && 
 		(reinterpret_cast<const dns_record_txt *>(Buffer))->TXT_Length == DNSCRYPT_RECORD_TXT_LEN && 
-		sodium_memcmp(&(reinterpret_cast<const dnscurve_txt_hdr *>(Buffer + sizeof(dns_record_txt)))->CertMagicNumber, DNSCRYPT_CERT_MAGIC, sizeof(uint16_t)) == 0 && 
+		sodium_memcmp(&reinterpret_cast<const dnscurve_txt_hdr *>(Buffer + sizeof(dns_record_txt))->CertMagicNumber, DNSCRYPT_CERT_MAGIC, sizeof(uint16_t)) == 0 && 
 		ntohs((reinterpret_cast<const dnscurve_txt_hdr *>(Buffer + sizeof(dns_record_txt)))->MinorVersion) == DNSCURVE_VERSION_MINOR)
 	{
 		if (ntohs((reinterpret_cast<const dnscurve_txt_hdr *>(Buffer + sizeof(dns_record_txt)))->MajorVersion) == DNSCURVE_ES_X25519_XSALSA20_POLY1305) //DNSCurve X25519-XSalsa20Poly1305
@@ -747,8 +748,8 @@ bool DNSCruveGetSignatureData(
 				return false;
 
 		//Check signature.
-			std::unique_ptr<uint8_t[]> DeBuffer(new uint8_t[PACKET_MAXSIZE]());
-			memset(DeBuffer.get(), 0, PACKET_MAXSIZE);
+			std::unique_ptr<uint8_t[]> DeBuffer(new uint8_t[NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES]());
+			memset(DeBuffer.get(), 0, NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
 			unsigned long long SignatureLength = 0;
 			if (PacketTarget == nullptr || 
 				crypto_sign_open(
@@ -808,11 +809,11 @@ bool DNSCruveGetSignatureData(
 				DNSCurvePrintLog(ServerType, Message);
 				if (!Message.empty())
 				{
-					Message.append(L"Fingerprint signature validation error");
+					Message.append(L"Fingerprint signature is not available in this time");
 					PrintError(LOG_LEVEL_TYPE::LEVEL_3, LOG_ERROR_TYPE::DNSCURVE, Message.c_str(), 0, nullptr, 0);
 				}
 				else {
-					PrintError(LOG_LEVEL_TYPE::LEVEL_3, LOG_ERROR_TYPE::DNSCURVE, L"Fingerprint signature validation error", 0, nullptr, 0);
+					PrintError(LOG_LEVEL_TYPE::LEVEL_3, LOG_ERROR_TYPE::DNSCURVE, L"Fingerprint signature is not available in this time", 0, nullptr, 0);
 				}
 			}
 		}

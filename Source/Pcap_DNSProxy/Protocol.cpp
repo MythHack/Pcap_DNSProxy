@@ -33,7 +33,7 @@ bool AddressStringToBinary(
 		memset(OriginalAddr, 0, sizeof(in_addr));
 	else 
 		return false;
-	
+
 //Initialization
 	std::string AddrString(reinterpret_cast<const char *>(AddrBuffer));
 	if (ErrorCode != nullptr)
@@ -89,7 +89,7 @@ bool AddressStringToBinary(
 			return false;
 		}
 
-		memcpy_s(OriginalAddr, sizeof((reinterpret_cast<sockaddr_in6 *>(&SockAddr))->sin6_addr), &(reinterpret_cast<sockaddr_in6 *>(&SockAddr))->sin6_addr, sizeof((reinterpret_cast<sockaddr_in6 *>(&SockAddr))->sin6_addr));
+		memcpy_s(OriginalAddr, sizeof((reinterpret_cast<sockaddr_in6 *>(&SockAddr))->sin6_addr), &reinterpret_cast<sockaddr_in6 *>(&SockAddr)->sin6_addr, sizeof((reinterpret_cast<sockaddr_in6 *>(&SockAddr))->sin6_addr));
 	#else
 		Result = inet_pton(AF_INET6, AddrString.c_str(), OriginalAddr);
 		if (Result == SOCKET_ERROR || Result == 0)
@@ -163,7 +163,7 @@ bool AddressStringToBinary(
 			return false;
 		}
 
-		memcpy_s(OriginalAddr, sizeof((reinterpret_cast<sockaddr_in *>(&SockAddr))->sin_addr), &(reinterpret_cast<sockaddr_in *>(&SockAddr))->sin_addr, sizeof((reinterpret_cast<sockaddr_in *>(&SockAddr))->sin_addr));
+		memcpy_s(OriginalAddr, sizeof((reinterpret_cast<sockaddr_in *>(&SockAddr))->sin_addr), &reinterpret_cast<sockaddr_in *>(&SockAddr)->sin_addr, sizeof((reinterpret_cast<sockaddr_in *>(&SockAddr))->sin_addr));
 	#else
 		Result = inet_pton(AF_INET, AddrString.c_str(), OriginalAddr);
 		if (Result == SOCKET_ERROR || Result == 0)
@@ -309,7 +309,7 @@ bool CheckSpecialAddress(
 	if (Protocol == AF_INET6)
 	{
 		if (
-		//DNS Poisoning addresses from CERNET2, please visit https://code.google.com/p/goagent/issues/detail?id=17571.		
+		//DNS Poisoning addresses from CERNET2, please visit https://code.google.com/p/goagent/issues/detail?id=17571.
 /*			((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[2U] == 0 && 
 			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[3U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[4U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[5U] == 0 && 
 			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[6U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[7U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[8U] == 0x90 && 
@@ -457,9 +457,15 @@ bool CheckSpecialAddress(
 			((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] >= 0xF0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] <= 0xF7) || //Reserved by IETF(F000::/5)
 			((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] >= 0xF8 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] <= 0xFB) || //Reserved by IETF(F800::/6)
 */
-			((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] >= 0xFC && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] <= 0xFD) || //Unique Local Unicast addresses/ULA(FC00::/7, Section 2.5.7 in RFC 4193)
-/*			((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] == 0xFE && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] <= 0x7F) || //Reserved by IETF(FE00::/9)
-*/			
+			(IsPrivateUse && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] >= 0xFC && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] <= 0xFD) || //Unique Local Unicast addresses/ULA(FC00::/7, Section 2.5.7 in RFC 4193)
+/*			!((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] == 0xFD && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] == 0x3E && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[2U] == 0x4F && 
+			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[3U] == 0x5A && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[4U] == 0x5B && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[5U] == 0x81 && 
+			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[6U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[7U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[8U] == 0 && 
+			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[9U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[10U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[11U] == 0 && 
+			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[12U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[13U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[14U] == 0 && 
+			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[15U] == 0x01)) || //Network Connectivity Status Indicator/NSCI and Resulting Internet Communication/RIC in Windows(FD3E:4F5A:5B81::1)
+			((static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] == 0xFE && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] <= 0x7F) || //Reserved by IETF(FE00::/9)
+*/
 			(IsPrivateUse && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] == 0xFE && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] >= 0x80 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] <= 0xBF) || //Link-Local Unicast Contrast addresses/LUC(FE80::/10, Section 2.5.6 in RFC 4291)
 /*			(IsPrivateUse && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[0] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[1U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[2U] == 0x5E && 
 			(static_cast<in6_addr *>(OriginalAddr))->s6_addr[3U] == 0xFE && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[4U] == 0 && (static_cast<in6_addr *>(OriginalAddr))->s6_addr[5U] == 0 && 
@@ -488,9 +494,9 @@ bool CheckSpecialAddress(
 						for (const auto &AddressRangeTableIter:ResultBlacklistTableIter.Addresses)
 						{
 							if ((AddressRangeTableIter.End.ss_family == AF_INET6 && 
-								AddressesComparing(AF_INET6, OriginalAddr, &(reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin))->sin6_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
-								AddressesComparing(AF_INET6, OriginalAddr, &(reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.End))->sin6_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
-								memcmp(OriginalAddr, &(reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin))->sin6_addr, sizeof(in6_addr)) == 0)
+								AddressesComparing(AF_INET6, OriginalAddr, &reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin)->sin6_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
+								AddressesComparing(AF_INET6, OriginalAddr, &reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.End)->sin6_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
+								memcmp(OriginalAddr, &reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin)->sin6_addr, sizeof(in6_addr)) == 0)
 									return true;
 						}
 					}
@@ -510,27 +516,27 @@ bool CheckSpecialAddress(
 					{
 					//Check address.
 						if ((AddressRangeTableIter.Begin.ss_family == AF_INET6 && AddressRangeTableIter.End.ss_family == AF_INET6 && 
-							AddressesComparing(AF_INET6, OriginalAddr, &(reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin))->sin6_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
-							AddressesComparing(AF_INET6, OriginalAddr, &(reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.End))->sin6_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
-							memcmp(OriginalAddr, &(reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin))->sin6_addr, sizeof(in6_addr)) == 0)
+							AddressesComparing(AF_INET6, OriginalAddr, &reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin)->sin6_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
+							AddressesComparing(AF_INET6, OriginalAddr, &reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.End)->sin6_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
+							memcmp(OriginalAddr, &reinterpret_cast<const sockaddr_in6 *>(&AddressRangeTableIter.Begin)->sin6_addr, sizeof(in6_addr)) == 0)
 						{
 							if (AddressHostsTableIter.Address_Target.size() > 1U)
 							{
 							//Get a ramdom one.
 								std::uniform_int_distribution<size_t> RamdomDistribution(0, AddressHostsTableIter.Address_Target.size() - 1U);
-								
+
 							//Rewrite address.
 								if (AddressHostsTableIter.Address_Target.front().second > 0)
 								{
 									if (AddressHostsTableIter.Address_Target.front().second < sizeof(in6_addr) * BYTES_TO_BITS / 2U)
 									{
 										*(static_cast<uint64_t *>(OriginalAddr)) = hton64(ntoh64(*(static_cast<uint64_t *>(OriginalAddr))) & (UINT64_MAX >> AddressHostsTableIter.Address_Target.front().second));
-										*(static_cast<uint64_t *>(OriginalAddr)) = hton64(ntoh64(*(static_cast<const uint64_t *>(OriginalAddr))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&(reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.at(RamdomDistribution(*GlobalRunningStatus.RamdomEngine)).first))->sin6_addr))));
+										*(static_cast<uint64_t *>(OriginalAddr)) = hton64(ntoh64(*(static_cast<const uint64_t *>(OriginalAddr))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.at(RamdomDistribution(*GlobalRunningStatus.RamdomEngine)).first)->sin6_addr))));
 									}
 									else {
-										*(static_cast<uint64_t *>(OriginalAddr)) = *(reinterpret_cast<const uint64_t *>(&(reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.at(RamdomDistribution(*GlobalRunningStatus.RamdomEngine)).first))->sin6_addr));
+										*(static_cast<uint64_t *>(OriginalAddr)) = *(reinterpret_cast<const uint64_t *>(&reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.at(RamdomDistribution(*GlobalRunningStatus.RamdomEngine)).first)->sin6_addr));
 										*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U)) = hton64(ntoh64(*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U))) & (UINT64_MAX >> (AddressHostsTableIter.Address_Target.front().second - sizeof(in6_addr) * BYTES_TO_BITS / 2U)));
-										*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U)) = hton64(ntoh64(*(reinterpret_cast<const uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&(reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.at(RamdomDistribution(*GlobalRunningStatus.RamdomEngine)).first))->sin6_addr))));
+										*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U)) = hton64(ntoh64(*(reinterpret_cast<const uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.at(RamdomDistribution(*GlobalRunningStatus.RamdomEngine)).first)->sin6_addr))));
 									}
 								}
 								else {
@@ -544,12 +550,12 @@ bool CheckSpecialAddress(
 									if (AddressHostsTableIter.Address_Target.front().second < sizeof(in6_addr) * BYTES_TO_BITS / 2U)
 									{
 										*(static_cast<uint64_t *>(OriginalAddr)) = hton64(ntoh64(*(static_cast<uint64_t *>(OriginalAddr))) & (UINT64_MAX >> AddressHostsTableIter.Address_Target.front().second));
-										*(static_cast<uint64_t *>(OriginalAddr)) = hton64(ntoh64(*(static_cast<const uint64_t *>(OriginalAddr))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&(reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.front().first))->sin6_addr))));
+										*(static_cast<uint64_t *>(OriginalAddr)) = hton64(ntoh64(*(static_cast<const uint64_t *>(OriginalAddr))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.front().first)->sin6_addr))));
 									}
 									else {
-										*(static_cast<uint64_t *>(OriginalAddr)) = *(reinterpret_cast<const uint64_t *>(&(reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.front().first))->sin6_addr));
+										*(static_cast<uint64_t *>(OriginalAddr)) = *(reinterpret_cast<const uint64_t *>(&reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.front().first)->sin6_addr));
 										*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U)) = hton64(ntoh64(*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U))) & (UINT64_MAX >> (AddressHostsTableIter.Address_Target.front().second - sizeof(in6_addr) * BYTES_TO_BITS / 2U)));
-										*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U)) = hton64(ntoh64(*(reinterpret_cast<const uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&(reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.front().first))->sin6_addr))));
+										*(reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U)) = hton64(ntoh64(*(reinterpret_cast<const uint64_t *>(static_cast<uint8_t *>(OriginalAddr) + sizeof(in6_addr) / 2U))) | ntoh64(*(reinterpret_cast<const uint64_t *>(&reinterpret_cast<const sockaddr_in6 *>(&AddressHostsTableIter.Address_Target.front().first)->sin6_addr))));
 									}
 								}
 								else {
@@ -660,8 +666,8 @@ bool CheckSpecialAddress(
 		//Also https://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.xhtml
 			*(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0 || //Current network whick only valid as source addresses(0.0.0.0/8, Section 3.2.1.3 in RFC 1122)
 			(IsPrivateUse && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0x0A) || //Private class A addresses(10.0.0.0/8, Section 3 in RFC 1918)
-			(*(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0x7F && //Loopback address(127.0.0.0/8, Section 3.2.1.3 in RFC 1122)
-			!(*(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == 0 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == 0 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) == 0x01)) || //The first of Loopback block address(127.0.0.1)
+			(IsPrivateUse && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0x7F) || //Loopback address(127.0.0.0/8, Section 3.2.1.3 in RFC 1122)
+//			!(*(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == 0 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == 0 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) == 0x01)) || //The first of Loopback block address(127.0.0.1)
 			( /* IsPrivateUse && */ *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0x64 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) > 0x40 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) < 0x7F) || //Carrier-grade NAT addresses(100.64.0.0/10, Section 7 in RFC 6598)
 			(IsPrivateUse && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0xA9 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) >= 0xFE) || //Link-local addresses(169.254.0.0/16, Section 1.5 in RFC 3927)
 			(IsPrivateUse && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr)) == 0xAC && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) >= 0x10 && *(reinterpret_cast<uint8_t *>(&(static_cast<in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) <= 0x1F) || //Private class B addresses(172.16.0.0/12, Section 3 in RFC 1918)
@@ -696,8 +702,8 @@ bool CheckSpecialAddress(
 						for (const auto &AddressRangeTableIter:ResultBlacklistTableIter.Addresses)
 						{
 							if ((AddressRangeTableIter.End.ss_family == AF_INET && 
-								AddressesComparing(AF_INET, OriginalAddr, &(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr)) >= ADDRESS_COMPARE_TYPE::EQUAL && 
-								AddressesComparing(AF_INET, OriginalAddr, &(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr)) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
+								AddressesComparing(AF_INET, OriginalAddr, &reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
+								AddressesComparing(AF_INET, OriginalAddr, &reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
 								(static_cast<in_addr *>(OriginalAddr))->s_addr == (reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr)
 									return true;
 						}
@@ -718,8 +724,8 @@ bool CheckSpecialAddress(
 					{
 					//Check address.
 						if ((AddressRangeTableIter.Begin.ss_family == AF_INET && AddressRangeTableIter.End.ss_family == AF_INET && 
-							AddressesComparing(AF_INET, OriginalAddr, &(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
-							AddressesComparing(AF_INET, OriginalAddr, &(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
+							AddressesComparing(AF_INET, OriginalAddr, &reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr) >= ADDRESS_COMPARE_TYPE::EQUAL && 
+							AddressesComparing(AF_INET, OriginalAddr, &reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr) <= ADDRESS_COMPARE_TYPE::EQUAL) || 
 							(static_cast<in_addr *>(OriginalAddr))->s_addr == (reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr)
 						{
 							if (AddressHostsTableIter.Address_Target.size() > 1U)
@@ -811,7 +817,8 @@ bool CheckAddressRouting(
 //Operation Mode address filter
 bool OperationModeFilter(
 	const uint16_t Protocol, 
-	const void * const OriginalAddr)
+	const void * const OriginalAddr, 
+	const LISTEN_MODE OperationMode)
 {
 //Empty address check
 	if ((Protocol == AF_INET6 && CheckEmptyBuffer(OriginalAddr, sizeof(in6_addr))) || //IPv6
@@ -820,14 +827,14 @@ bool OperationModeFilter(
 		return false;
 	}
 //Proxy Mode address filter
-	else if (Parameter.OperationMode == LISTEN_MODE::PROXY)
+	else if (OperationMode == LISTEN_MODE::PROXY)
 	{
 		if ((Protocol == AF_INET6 && memcmp(OriginalAddr, &in6addr_loopback, sizeof(in6_addr)) == 0) || //Loopback address(::1, Section 2.5.3 in RFC 4291
 			(Protocol == AF_INET && (static_cast<const in_addr *>(OriginalAddr))->s_addr == htonl(INADDR_LOOPBACK))) //Loopback address(127.0.0.0/8, Section 3.2.1.3 in RFC 1122)
 				return true;
 	}
 //Private Mode address filter
-	else if (Parameter.OperationMode == LISTEN_MODE::PRIVATE)
+	else if (OperationMode == LISTEN_MODE::PRIVATE)
 	{
 	//IPv6
 		if (Protocol == AF_INET6)
@@ -845,16 +852,16 @@ bool OperationModeFilter(
 				(*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == 0xA9 && *(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) >= 0xFE) || //Link-local addresses(169.254.0.0/16, Section 1.5 in RFC 3927)
 				(*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == 0xAC && *(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) >= 0x10 && *(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) <= 0x1F) || //Private class B address(172.16.0.0/12, Section 3 in RFC 1918)
 				(*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == 0xC0 && *(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == 0xA8)) //Private class C address(192.168.0.0/16, Section 3 in RFC 1918)
-				return true;
+					return true;
 		}
 	}
 //Server Mode address filter
-	else if (Parameter.OperationMode == LISTEN_MODE::SERVER)
+	else if (OperationMode == LISTEN_MODE::SERVER)
 	{
 		return true;
 	}
 //Custom Mode address filter
-	else if (Parameter.OperationMode == LISTEN_MODE::CUSTOM)
+	else if (OperationMode == LISTEN_MODE::CUSTOM)
 	{
 		std::lock_guard<std::mutex> IPFilterFileMutex(IPFilterFileLock);
 		if (Protocol == AF_INET6)
@@ -935,32 +942,32 @@ bool OperationModeFilter(
 							continue;
 
 					//Check address.
-						if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) > *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr)) && 
-							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) < *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr)))
+						if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) > *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr)) && 
+							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) < *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr)))
 						{
 							return true;
 						}
-						else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr)) || 
-							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr)))
+						else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr)) || 
+							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr)))
 						{
-							if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) > *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t)) && 
-								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) < *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t)))
+							if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) > *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t)) && 
+								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) < *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t)))
 							{
 								return true;
 							}
-							else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t)) || 
-								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t)))
+							else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t)) || 
+								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t)))
 							{
-								if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) > *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t) * 2U) && 
-									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) < *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
+								if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) > *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t) * 2U) && 
+									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) < *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
 								{
 									return true;
 								}
-								else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t) * 2U) || 
-									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
+								else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t) * 2U) || 
+									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
 								{
-									if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) >= *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t) * 3U) && 
-										*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) <= *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t) * 3U))
+									if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) >= *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t) * 3U) && 
+										*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) <= *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t) * 3U))
 											return true;
 								}
 							}
@@ -981,32 +988,32 @@ bool OperationModeFilter(
 							continue;
 
 					//Check address.
-						if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) > *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr)) && 
-							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) < *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr)))
+						if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) > *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr)) && 
+							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) < *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr)))
 						{
 							return false;
 						}
-						else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr)) || 
-							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr)))
+						else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr)) || 
+							*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr)))
 						{
-							if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) > *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t)) && 
-								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) < *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t)))
+							if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) > *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t)) && 
+								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) < *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t)))
 							{
 								return false;
 							}
-							else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t)) || 
-								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t)))
+							else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t)) || 
+								*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t)) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t)))
 							{
-								if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) > *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t) * 2U) && 
-									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) < *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
+								if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) > *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t) * 2U) && 
+									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) < *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
 								{
 									return false;
 								}
-								else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t) * 2U) || 
-									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
+								else if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t) * 2U) || 
+									*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 2U) == *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t) * 2U))
 								{
-									if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) >= *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin))->sin_addr.s_addr) + sizeof(uint8_t) * 3U) && 
-										*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) <= *(reinterpret_cast<const uint8_t *>(&(reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End))->sin_addr.s_addr) + sizeof(uint8_t) * 3U))
+									if (*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) >= *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.Begin)->sin_addr.s_addr) + sizeof(uint8_t) * 3U) && 
+										*(reinterpret_cast<const uint8_t *>(&(static_cast<const in_addr *>(OriginalAddr))->s_addr) + sizeof(uint8_t) * 3U) <= *(reinterpret_cast<const uint8_t *>(&reinterpret_cast<const sockaddr_in *>(&AddressRangeTableIter.End)->sin_addr.s_addr) + sizeof(uint8_t) * 3U))
 											return false;
 								}
 							}
@@ -1046,21 +1053,21 @@ bool CheckQueryData(
 	DNS_PACKET_DATA * const Packet, 
 	uint8_t * const SendBuffer, 
 	const size_t SendSize, 
-	const SOCKET_DATA &LocalSocketData)
+	SOCKET_DATA &LocalSocketData)
 {
 //Check address(UDP monitor and TCP monitor when accepting connections).
 	if (Packet == nullptr || SendBuffer == nullptr || SendSize < DNS_PACKET_MINSIZE || Packet->Protocol == IPPROTO_UDP)
 	{
 	//IPv6
-		if (LocalSocketData.AddrLen == sizeof(sockaddr_in6)) 
+		if (LocalSocketData.AddrLen == sizeof(sockaddr_in6))
 		{
-			if (!OperationModeFilter(AF_INET6, &(reinterpret_cast<const sockaddr_in6 *>(&LocalSocketData.SockAddr))->sin6_addr))
+			if (!OperationModeFilter(AF_INET6, &reinterpret_cast<const sockaddr_in6 *>(&LocalSocketData.SockAddr)->sin6_addr, Parameter.OperationMode))
 				return false;
 		}
 	//IPv4
 		else if (LocalSocketData.AddrLen == sizeof(sockaddr_in))
 		{
-			if (!OperationModeFilter(AF_INET, &(reinterpret_cast<const sockaddr_in *>(&LocalSocketData.SockAddr))->sin_addr))
+			if (!OperationModeFilter(AF_INET, &reinterpret_cast<const sockaddr_in *>(&LocalSocketData.SockAddr)->sin_addr, Parameter.OperationMode))
 				return false;
 		}
 		else {
@@ -1076,7 +1083,7 @@ bool CheckQueryData(
 	const auto DNS_Header = reinterpret_cast<dns_hdr *>(Packet->Buffer);
 	if (
 	//Base DNS header check
-		DNS_Header->ID == 0 || //ID must not be set 0.
+//		DNS_Header->ID == 0 || //ID must not be set 0.
 //		DNS_Header->Flags == 0 || //Flags must not be set 0.
 	//Extended DNS header check
 		(Parameter.HeaderCheck_DNS && 
@@ -1089,13 +1096,13 @@ bool CheckQueryData(
 	//Must not set RCode.
 		(ntohs(DNS_Header->Flags) & DNS_GET_BIT_RCODE) > 0 || 
 	//Question Resource Records Counts must be set 1.
-		ntohs(DNS_Header->Question) != U16_NUM_1 || 
+		ntohs(DNS_Header->Question) != U16_NUM_ONE || 
 	//Answer Resource Records Counts must be set 0.
 		DNS_Header->Answer > 0 || 
 	//Authority Resource Records Counts must be set 0.
 		DNS_Header->Authority > 0 || 
-	//Additional Resource Records Counts must be set 1 or 0.
-		ntohs(DNS_Header->Additional) > U16_NUM_1)))
+	//Additional Resource Records Counts must be set 0 or 1.
+		ntohs(DNS_Header->Additional) > U16_NUM_ONE)))
 			return false;
 
 //Scan all Resource Records.
@@ -1169,8 +1176,8 @@ bool CheckQueryData(
 	{
 	//Check special address.
 		SOCKET_DATA *EDNS_SocketData = nullptr;
-		if ((LocalSocketData.AddrLen == sizeof(sockaddr_in6) && !CheckSpecialAddress(AF_INET6, &(reinterpret_cast<sockaddr_in6 *>(const_cast<sockaddr_storage *>(&LocalSocketData.SockAddr)))->sin6_addr, true, nullptr)) || //IPv6
-			(LocalSocketData.AddrLen == sizeof(sockaddr_in) && !CheckSpecialAddress(AF_INET, &(reinterpret_cast<sockaddr_in *>(const_cast<sockaddr_storage *>(&LocalSocketData.SockAddr)))->sin_addr, true, nullptr))) //IPv4
+		if ((LocalSocketData.AddrLen == sizeof(sockaddr_in6) && !CheckSpecialAddress(AF_INET6, &reinterpret_cast<sockaddr_in6 *>(const_cast<sockaddr_storage *>(&LocalSocketData.SockAddr))->sin6_addr, true, nullptr)) || //IPv6
+			(LocalSocketData.AddrLen == sizeof(sockaddr_in) && !CheckSpecialAddress(AF_INET, &reinterpret_cast<sockaddr_in *>(const_cast<sockaddr_storage *>(&LocalSocketData.SockAddr))->sin_addr, true, nullptr))) //IPv4
 				EDNS_SocketData = const_cast<SOCKET_DATA *>(&LocalSocketData);
 
 	//Add EDNS Label to query data.
@@ -1212,7 +1219,7 @@ bool CheckConnectionStreamFin(
 //HTTP version 2 CONNECT method
 	else if (RequestType == REQUEST_PROCESS_TYPE::HTTP_CONNECT_2)
 	{
-	//HTTP version 1.x response, or HTTP version 2 large length is not supported.
+	//HTTP version 1.x response and HTTP version 2 large length are not supported.
 		if (*Stream != 0)
 		{
 		//Length check
@@ -1329,8 +1336,10 @@ bool CheckConnectionStreamFin(
 	}
 #endif
 //TCP DNS response
-	else if ((RequestType == REQUEST_PROCESS_TYPE::SOCKS_MAIN || RequestType == REQUEST_PROCESS_TYPE::TCP) && 
-		Length > sizeof(uint16_t) && ntohs(*(reinterpret_cast<const uint16_t *>(Stream))) + sizeof(uint16_t) >= Length)
+	else if ((RequestType == REQUEST_PROCESS_TYPE::SOCKS_MAIN || RequestType == REQUEST_PROCESS_TYPE::TCP_NORMAL || RequestType == REQUEST_PROCESS_TYPE::TCP_WITHOUT_MARKING) && 
+		Length > sizeof(uint16_t) && 
+		ntohs(*(reinterpret_cast<const uint16_t *>(Stream))) >= DNS_PACKET_MINSIZE && 
+		ntohs(*(reinterpret_cast<const uint16_t *>(Stream))) + sizeof(uint16_t) >= Length)
 	{
 		return true;
 	}
@@ -1372,7 +1381,7 @@ size_t CheckResponse_CNAME(
 		{
 			IsMatchItem = false;
 
-		//Dnsmasq normal mode(http://www.thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)
+		//Dnsmasq normal mode, please visit http://www.thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html.
 			if (HostsTableIter.IsStringMatching && !HostsTableIter.PatternOrDomainString.empty())
 			{
 				if (HostsTableIter.PatternOrDomainString == ("#") || //Dnsmasq "#" matches any domain.
@@ -1537,8 +1546,8 @@ size_t CheckResponseData(
 	const auto DNS_Header = reinterpret_cast<dns_hdr *>(Buffer);
 	if (
 	//Base DNS header check
-		DNS_Header->ID == 0 || //ID must not be set 0.
-		DNS_Header->Flags == 0 || //Flags must not be set 0.
+//		DNS_Header->ID == 0 || //ID must not be set 0.
+		DNS_Header->Flags == 0 || //Flags must not be set 0, first bit in Flags must be set 1 to show it's a response. 
 	//NoCheck flag
 		(
 	#if defined(ENABLE_LIBSODIUM)
@@ -1561,7 +1570,7 @@ size_t CheckResponseData(
 	//Must not set Reserved bit.
 		(ntohs(DNS_Header->Flags) & DNS_GET_BIT_Z) > 0 || 
 	//Question Resource Records Counts must be set 1.
-		ntohs(DNS_Header->Question) != U16_NUM_1 || 
+		ntohs(DNS_Header->Question) != U16_NUM_ONE || 
 	//Additional EDNS Label Resource Records check
 		(Parameter.EDNS_Label && DNS_Header->Additional == 0 && 
 		(ResponseType == REQUEST_PROCESS_TYPE::NONE || //Normal
@@ -1572,7 +1581,7 @@ size_t CheckResponseData(
 	#if defined(ENABLE_LIBSODIUM)
 		(ResponseType == REQUEST_PROCESS_TYPE::DNSCURVE_MAIN && Parameter.EDNS_Switch_DNSCurve) || //DNSCurve
 	#endif
-		(ResponseType == REQUEST_PROCESS_TYPE::TCP && Parameter.EDNS_Switch_TCP) || //TCP
+		((ResponseType == REQUEST_PROCESS_TYPE::TCP_NORMAL || ResponseType == REQUEST_PROCESS_TYPE::TCP_WITHOUT_MARKING) && Parameter.EDNS_Switch_TCP) || //TCP
 		((ResponseType == REQUEST_PROCESS_TYPE::UDP_NORMAL || ResponseType == REQUEST_PROCESS_TYPE::UDP_WITHOUT_MARKING) && Parameter.EDNS_Switch_UDP)))))) //UDP
 			return EXIT_FAILURE;
 
@@ -1590,7 +1599,7 @@ size_t CheckResponseData(
 		}
 
 	//Check repeating DNS Domain without Compression.
-		if (ntohs(DNS_Header->Answer) == U16_NUM_1 && DNS_Header->Authority == 0 && DNS_Header->Additional == 0 && 
+		if (ntohs(DNS_Header->Answer) == U16_NUM_ONE && DNS_Header->Authority == 0 && DNS_Header->Additional == 0 && 
 			CheckQueryNameLength(Buffer + sizeof(dns_hdr)) == CheckQueryNameLength(Buffer + DNS_PACKET_RR_LOCATE(Buffer)))
 		{
 			if (ntohs((reinterpret_cast<dns_record_standard *>(Buffer + DNS_PACKET_RR_LOCATE(Buffer) + CheckQueryNameLength(Buffer + sizeof(dns_hdr)) + NULL_TERMINATE_LENGTH))->Classes) == DNS_CLASS_INTERNET && 
@@ -1708,7 +1717,7 @@ size_t CheckResponseData(
 						return EXIT_FAILURE;
 				}
 
-			//Set successful flag.
+			//Set got result flag.
 				IsGotAddressResult = true;
 			}
 		//A record(IPv4)
@@ -1734,7 +1743,7 @@ size_t CheckResponseData(
 						return EXIT_FAILURE;
 				}
 
-			//Set successful flag.
+			//Set got result flag.
 				IsGotAddressResult = true;
 			}
 		}
@@ -1764,7 +1773,7 @@ size_t CheckResponseData(
 	#if defined(ENABLE_LIBSODIUM)
 		(ResponseType == REQUEST_PROCESS_TYPE::DNSCURVE_MAIN && Parameter.EDNS_Switch_DNSCurve) || //DNSCurve
 	#endif
-		(ResponseType == REQUEST_PROCESS_TYPE::TCP && Parameter.EDNS_Switch_TCP) || //TCP
+		((ResponseType == REQUEST_PROCESS_TYPE::TCP_NORMAL || ResponseType == REQUEST_PROCESS_TYPE::TCP_WITHOUT_MARKING) && Parameter.EDNS_Switch_TCP) || //TCP
 		((ResponseType == REQUEST_PROCESS_TYPE::UDP_NORMAL || ResponseType == REQUEST_PROCESS_TYPE::UDP_WITHOUT_MARKING) && Parameter.EDNS_Switch_UDP)) && //UDP
 		(!IsEDNS_Label || (Parameter.DNSSEC_Request && Parameter.DNSSEC_ForceValidation && !IsDNSSEC_Records))) || 
 		(ResponseType == REQUEST_PROCESS_TYPE::LOCAL && !Parameter.IsLocalForce && !IsGotAddressResult)
@@ -1779,9 +1788,9 @@ size_t CheckResponseData(
 	if (
 	#if defined(ENABLE_LIBSODIUM)
 		ResponseType != REQUEST_PROCESS_TYPE::DNSCURVE_SIGN && 
-	#endif	
+	#endif
 		((IsMarkHopLimits != nullptr && Parameter.HeaderCheck_DNS && 
-//		ntohs(DNS_Header->Answer) != U16_NUM_1 || //Some ISP will return fake responses with more than one Answer records.
+//		ntohs(DNS_Header->Answer) != U16_NUM_ONE || //Some ISP will return fake responses with more than one Answer records.
 		(DNS_Header->Answer == 0 || //No any Answer records
 		DNS_Header->Authority > 0 || DNS_Header->Additional > 0 || //More than one Authority records and/or Additional records
 		(ntohs(DNS_Header->Flags) & DNS_GET_BIT_RCODE) == DNS_RCODE_NXDOMAIN)) || //No Such Name, not standard query response and no error check.

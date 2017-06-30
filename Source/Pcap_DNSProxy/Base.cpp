@@ -450,15 +450,15 @@ bool MBS_To_WCS_String(
 			reinterpret_cast<const LPCCH>(Buffer), 
 			MBSTOWCS_NULL_TERMINATE, 
 			TargetBuffer.get(), 
-			static_cast<int>(Length + PADDING_RESERVED_BYTES)) == 0)
+			static_cast<int>(Length + NULL_TERMINATE_LENGTH)) == 0)
 #elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	if (mbstowcs(TargetBuffer.get(), reinterpret_cast<const char *>(Buffer), Length + PADDING_RESERVED_BYTES) == static_cast<size_t>(RETURN_ERROR))
+	if (mbstowcs(TargetBuffer.get(), reinterpret_cast<const char *>(Buffer), Length + NULL_TERMINATE_LENGTH) == static_cast<size_t>(RETURN_ERROR))
 #endif
 	{
 		return false;
 	}
 	else {
-		if (wcsnlen_s(TargetBuffer.get(), Length + PADDING_RESERVED_BYTES) == 0)
+		if (wcsnlen_s(TargetBuffer.get(), Length + NULL_TERMINATE_LENGTH) == 0)
 			return false;
 		else 
 			Target = TargetBuffer.get();
@@ -493,17 +493,17 @@ bool WCS_To_MBS_String(
 			Buffer, 
 			WCSTOMBS_NULL_TERMINATE, 
 			reinterpret_cast<LPSTR>(TargetBuffer.get()), 
-			static_cast<int>(Length + PADDING_RESERVED_BYTES), 
+			static_cast<int>(Length + NULL_TERMINATE_LENGTH), 
 			nullptr, 
 			nullptr) == 0)
 #elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	if (wcstombs(reinterpret_cast<char *>(TargetBuffer.get()), Buffer, Length + PADDING_RESERVED_BYTES) == static_cast<size_t>(RETURN_ERROR))
+	if (wcstombs(reinterpret_cast<char *>(TargetBuffer.get()), Buffer, Length + NULL_TERMINATE_LENGTH) == static_cast<size_t>(RETURN_ERROR))
 #endif
 	{
 		return false;
 	}
 	else {
-		if (strnlen_s(reinterpret_cast<const char *>(TargetBuffer.get()), Length + PADDING_RESERVED_BYTES) == 0)
+		if (strnlen_s(reinterpret_cast<const char *>(TargetBuffer.get()), Length + NULL_TERMINATE_LENGTH) == 0)
 			return false;
 		else 
 			Target = reinterpret_cast<const char *>(TargetBuffer.get());
@@ -518,7 +518,7 @@ void CaseConvert(
 	const size_t Length, 
 	const bool IsLowerToUpper)
 {
-	if (Buffer != nullptr && Length > 0)
+	if (Buffer != nullptr)
 	{
 	//Convert words.
 		for (size_t Index = 0;Index < Length;++Index)
@@ -623,21 +623,20 @@ bool CompareStringReversed(
 	const wchar_t * const RuleItem, 
 	const wchar_t * const TestItem)
 {
-//Buffer check
-	if (RuleItem == nullptr || TestItem == nullptr)
-		return false;
-
-//Length check
-	std::wstring InnerRuleItem(RuleItem), InnerTestItem(TestItem);
-	if (!InnerRuleItem.empty() && !InnerTestItem.empty() && InnerTestItem.length() >= InnerRuleItem.length())
+//Buffer and length check
+	if (RuleItem != nullptr && TestItem != nullptr)
 	{
-	//Make string reversed to compare.
-		MakeStringReversed(InnerRuleItem);
-		MakeStringReversed(InnerTestItem);
+		std::wstring InnerRuleItem(RuleItem), InnerTestItem(TestItem);
+		if (!InnerRuleItem.empty() && !InnerTestItem.empty() && InnerTestItem.length() >= InnerRuleItem.length())
+		{
+		//Make string reversed to compare.
+			MakeStringReversed(InnerRuleItem);
+			MakeStringReversed(InnerTestItem);
 
-	//Compare each other.
-		if (InnerTestItem.compare(0, InnerRuleItem.length(), InnerRuleItem) == 0)
-			return true;
+		//Compare each other.
+			if (InnerTestItem.compare(0, InnerRuleItem.length(), InnerRuleItem) == 0)
+				return true;
+		}
 	}
 
 	return false;
@@ -660,7 +659,7 @@ bool SortCompare_Hosts(
 }
 
 //Base64 encoding
-//Base64 encoding and decoding are from https://github.com/zhicheng/base64.
+//Base64 encoding and decoding, please visit https://github.com/zhicheng/base64.
 size_t Base64_Encode(
 	uint8_t * const Input, 
 	const size_t Length, 
@@ -718,7 +717,7 @@ size_t Base64_Encode(
 }
 
 //Base64 decoding
-//Base64 encoding and decoding are from https://github.com/zhicheng/base64.
+//Base64 encoding and decoding, please visit https://github.com/zhicheng/base64.
 size_t Base64_Decode(
 	uint8_t *Input, 
 	const size_t Length, 
@@ -755,6 +754,7 @@ size_t Base64_Decode(
 			//If not last char with padding
 				if (Index[0] < (Length - 3U) || Input[Length - 2U] != static_cast<uint8_t>(BASE64_PAD))
 					Output[Index[1U]] = (StringIter & 0xF) << 4U;
+
 				continue;
 			}
 			case 2U:
@@ -764,6 +764,7 @@ size_t Base64_Decode(
 			//If not last char with padding
 				if (Index[0] < (Length - 2U) || Input[Length - 1U] != static_cast<uint8_t>(BASE64_PAD))
 					Output[Index[1U]] = (StringIter & 0x3) << 6U;
+
 				continue;
 			}
 			case 3U:
@@ -777,7 +778,7 @@ size_t Base64_Decode(
 }
 
 //HTTP version 2 HPACK Header Compression static huffman encoding
-//HPACK huffman encoding and decoding are from https://github.com/phluid61/mk-hpack.
+//HPACK huffman encoding and decoding, please visit https://github.com/phluid61/mk-hpack.
 HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 	uint8_t *String, 
 	size_t ByteSize, 
@@ -803,8 +804,8 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 		++String;
 		++(*Consumed);
 		--ByteSize;
-		BitQueue = ((BitQueue << Huffman_Node.Size) | Huffman_Node.Bits); //Max 33 bits wide
-		BitLength += Huffman_Node.Size;
+		BitQueue = ((BitQueue << Huffman_Node.BitSize) | Huffman_Node.Bits); //Max 33 bits wide
+		BitLength += Huffman_Node.BitSize;
 
 	//Canibalise the top bytes.
 		while (BitLength >= 8U)
@@ -824,7 +825,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 			BitLength -= 8U;
 		}
 	}
-	
+
 //Pad with EOS(incidentally all 1s).
 	if (BitLength > 0)
 	{
@@ -844,7 +845,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 }
 
 //HTTP version 2 HPACK Header Compression huffman decoding
-//HPACK huffman encoding and decoding are from https://github.com/phluid61/mk-hpack.
+//HPACK huffman encoding and decoding, please visit https://github.com/phluid61/mk-hpack.
 HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 	uint8_t *HuffmanBuffer, 
 	size_t ByteSize, 
@@ -855,7 +856,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 {
 	auto TC = *HuffmanDecodes;
 	uint16_t Temp = 0;
-	uint8_t Byte = 0, BC = 0, Mask = 0;
+	uint8_t ByteIter = 0, BC = 0, Mask = 0;
 	size_t _Produced = 0, _Consumed = 0;
 	if (!Produced)
 		Produced = &_Produced;
@@ -874,7 +875,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 
 	while (ByteSize > 0)
 	{
-		Byte = *HuffmanBuffer;
+		ByteIter = *HuffmanBuffer;
 		++HuffmanBuffer;
 		++(*Consumed);
 		--ByteSize;
@@ -882,7 +883,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 		Mask = 0x7F; //Padding mask
 		while (BC > 0)
 		{
-			if ((Byte & BC) == BC)
+			if ((ByteIter & BC) == BC)
 				Temp = ONE(TC);
 			else 
 				Temp = ZERO(TC);
@@ -901,7 +902,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 						--Length;
 					}
 					++(*Produced);
-					if (ByteSize < 1 && (Byte & Mask) == Mask)
+					if (ByteSize < 1 && (ByteIter & Mask) == Mask)
 					{
 						TC = 0;
 						goto Done;
@@ -931,7 +932,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 #undef ONE
 #undef IS_INT
 #undef VALUE_OF
-	
+
 Done:
 	if (TC)
 		return HUFFMAN_RETURN_TYPE::ERROR_TRUNCATED;

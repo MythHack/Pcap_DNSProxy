@@ -28,7 +28,8 @@ https://sourceforge.net/projects/pcap-dnsproxy
     * 设置程序、脚本以及 plist 配置文件的基本读写执行权限
     * 装载并启动守护进程服务
     * 以后每次开机在登录前守护进程服务都将自动启动
-5.打开 "系统偏好设置" 窗口
+5.请按照下文 正常工作查看方法 一节，先对程序是否在正常工作进行测试再修改网络配置！
+6.打开 "系统偏好设置" 窗口
   * 进入 "网络" 部分
   * 选中使用的网络适配器，点击 "高级" 按钮
   * 切换到 "DNS" 选项卡，并点击 "DNS服务器" 下的 "+" 号
@@ -43,7 +44,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
 安装方法（编译二进制可执行文件）：
 
 1.准备程序编译环境
-  * Homebrew 可访问 http://brew.sh 获取
+  * Homebrew 可访问 https://brew.sh 获取
   * CMake 可访问 https://cmake.org 或通过 Homebrew 获取
   * LibPcap 可访问 http://www.tcpdump.org/#latest-release 获取
     * 编译时如果剥离 LibPcap 的依赖则可跳过编译和安装下表的依赖库和工具，具体参见下文的介绍，不建议使用
@@ -69,7 +70,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
       * 剥离后程序将完全失去支持 LibPcap 的功能，且运行时将不会产生任何错误提示，慎用！
     * 执行时使用 ./CMake_Build.sh --disable-libsodium 可剥离对 Libsodium 的依赖，不建议使用
       * 剥离后编译时将不需要 Libsodium 库的支持
-      * 剥离后程序将完全失去支持 DNSCurve/DNSCrypt 协议的功能，且运行时将不会产生任何错误提示，慎用！
+      * 剥离后程序将完全失去支持 DNSCurve(DNSCrypt) 协议的功能，且运行时将不会产生任何错误提示，慎用！
     * 执行时使用 ./CMake_Build.sh --disable-tls 可剥离对 OpenSSL 的依赖，不建议使用
       * 剥离后编译时将不需要 OpenSSL 库的支持
       * 剥离后程序将完全失去支持 TLS/SSL 协议的功能，且运行时将不会产生任何错误提示，慎用！
@@ -130,7 +131,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
 正常工作查看方法：
 
 1.打开终端
-2.输入 dig www.google.com 并回车
+2.输入 dig @127.0.0.1 www.google.com 或者 dig @::1 www.google.com 并回车
 3.运行结果应类似：
 
    >dig www.google.com
@@ -147,7 +148,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
    ...
 
    ;; Query time: ... msec
-   ;; SERVER: ::1#53(::1)（IPv6，IPv4 下为 127.0.0.1）
+   ;; SERVER: ::1#53(::1)（视所在网络环境而定，本地监听协议为 IPv4 时为 127.0.0.1）
    ;; WHEN: ...
    ;; MSG SIZE  rcvd: ...
 

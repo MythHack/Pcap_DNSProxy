@@ -197,7 +197,7 @@ ConfigurationTable::ConfigurationTable(
 //Check itself.
 	if (this == &Reference)
 		return;
-	
+
 //Class constructor
 	memset(this, 0, sizeof(CONFIGURATION_TABLE));
 	try {
@@ -374,6 +374,8 @@ ConfigurationTable::ConfigurationTable(
 	DirectRequest = Reference.DirectRequest;
 	DNS_CacheType = Reference.DNS_CacheType;
 	DNS_CacheParameter = Reference.DNS_CacheParameter;
+	DNS_CacheSinglePrefix_IPv6 = Reference.DNS_CacheSinglePrefix_IPv6;
+	DNS_CacheSinglePrefix_IPv4 = Reference.DNS_CacheSinglePrefix_IPv4;
 	HostsDefaultTTL = Reference.HostsDefaultTTL;
 
 	//[Local DNS] block
@@ -510,6 +512,9 @@ ConfigurationTable::ConfigurationTable(
 		ICMP_PaddingData = nullptr;
 	}
 	ICMP_PaddingLength = Reference.ICMP_PaddingLength;
+	DomainTest_Protocol = Reference.DomainTest_Protocol;
+	DomainTest_ID = Reference.DomainTest_ID;
+	DomainTest_Speed = Reference.DomainTest_Speed;
 	if (Reference.DomainTest_Data != nullptr)
 	{
 		memcpy_s(DomainTest_Data, DOMAIN_MAXSIZE, Reference.DomainTest_Data, DOMAIN_MAXSIZE);
@@ -518,8 +523,6 @@ ConfigurationTable::ConfigurationTable(
 		delete[] DomainTest_Data;
 		DomainTest_Data = nullptr;
 	}
-	DomainTest_ID = Reference.DomainTest_ID;
-	DomainTest_Speed = Reference.DomainTest_Speed;
 #endif
 	if (Reference.Local_FQDN_String != nullptr)
 	{
@@ -644,7 +647,7 @@ ConfigurationTable::ConfigurationTable(
 		HTTP_CONNECT_ProxyAuthorization = nullptr;
 	}
 
-	//[DNSCurve/DNSCrypt] block
+	//[DNSCurve] block
 #if defined(ENABLE_LIBSODIUM)
 	IsDNSCurve = Reference.IsDNSCurve;
 #endif
@@ -716,6 +719,7 @@ void ConfigurationTableSetting(
 #endif
 #if defined(ENABLE_PCAP)
 	ConfigurationParameter->ICMP_Speed = DEFAULT_ICMP_TEST_TIME * SECOND_TO_MILLISECOND;
+	ConfigurationParameter->DomainTest_Protocol = REQUEST_MODE_TEST::UDP;
 	ConfigurationParameter->DomainTest_Speed = DEFAULT_DOMAIN_TEST_INTERVAL_TIME * SECOND_TO_MILLISECOND;
 #endif
 	ConfigurationParameter->AlternateTimes = DEFAULT_ALTERNATE_TIMES;
@@ -932,6 +936,7 @@ void ConfigurationTable::MonitorItemToUsing(
 	ConfigurationParameter->ReceiveWaiting = ReceiveWaiting;
 #if defined(ENABLE_PCAP)
 	ConfigurationParameter->ICMP_Speed = ICMP_Speed;
+	ConfigurationParameter->DomainTest_Protocol = DomainTest_Protocol;
 	ConfigurationParameter->DomainTest_Speed = DomainTest_Speed;
 #endif
 	ConfigurationParameter->MultipleRequestTimes = MultipleRequestTimes;
@@ -1062,6 +1067,7 @@ void ConfigurationTable::MonitorItemReset(
 	ReceiveWaiting = 0;
 #if defined(ENABLE_PCAP)
 	ICMP_Speed = DEFAULT_ICMP_TEST_TIME * SECOND_TO_MILLISECOND;
+	DomainTest_Protocol = REQUEST_MODE_TEST::UDP;
 	DomainTest_Speed = DEFAULT_DOMAIN_TEST_INTERVAL_TIME * SECOND_TO_MILLISECOND;
 #endif
 	MultipleRequestTimes = 0;
@@ -1118,8 +1124,8 @@ GlobalStatus::GlobalStatus(
 		MBS_FileList_Hosts = new std::vector<std::string>();
 		MBS_FileList_IPFilter = new std::vector<std::string>();
 	#endif
-		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6] = new uint8_t[PACKET_MAXSIZE]();
-		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4] = new uint8_t[PACKET_MAXSIZE]();
+		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6] = new uint8_t[NORMAL_PACKET_MAXSIZE]();
+		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4] = new uint8_t[NORMAL_PACKET_MAXSIZE]();
 	#if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
 		LocalAddress_PointerResponse[NETWORK_LAYER_TYPE_IPV6] = new std::vector<std::string>();
 		LocalAddress_PointerResponse[NETWORK_LAYER_TYPE_IPV4] = new std::vector<std::string>();
@@ -1197,8 +1203,8 @@ GlobalStatus::GlobalStatus(
 		MBS_FileList_Hosts = new std::vector<std::string>();
 		MBS_FileList_IPFilter = new std::vector<std::string>();
 	#endif
-		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6] = new uint8_t[PACKET_MAXSIZE]();
-		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4] = new uint8_t[PACKET_MAXSIZE]();
+		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6] = new uint8_t[NORMAL_PACKET_MAXSIZE]();
+		LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4] = new uint8_t[NORMAL_PACKET_MAXSIZE]();
 	#if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
 		LocalAddress_PointerResponse[NETWORK_LAYER_TYPE_IPV6] = new std::vector<std::string>();
 		LocalAddress_PointerResponse[NETWORK_LAYER_TYPE_IPV4] = new std::vector<std::string>();
@@ -1355,8 +1361,8 @@ GlobalStatus::GlobalStatus(
 		MBS_FileList_IPFilter = nullptr;
 	}
 #endif
-	memcpy_s(LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6], PACKET_MAXSIZE, Reference.LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6], PACKET_MAXSIZE);
-	memcpy_s(LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4], PACKET_MAXSIZE, Reference.LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4], PACKET_MAXSIZE);
+	memcpy_s(LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6], NORMAL_PACKET_MAXSIZE, Reference.LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6], NORMAL_PACKET_MAXSIZE);
+	memcpy_s(LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4], NORMAL_PACKET_MAXSIZE, Reference.LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4], NORMAL_PACKET_MAXSIZE);
 #if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
 	if (Reference.LocalAddress_PointerResponse[NETWORK_LAYER_TYPE_IPV6] != nullptr)
 	{
@@ -1393,8 +1399,8 @@ void GlobalStatusSetting(
 	GlobalRunningStatusParameter->Base64_EncodeTable = const_cast<uint8_t *>(Base64_EncodeTable_Initialization);
 	GlobalRunningStatusParameter->Base64_DecodeTable = const_cast<int8_t *>(Base64_DecodeTable_Initialization);
 	GlobalRunningStatusParameter->GatewayAvailable_IPv4 = true;
-	memset(GlobalRunningStatusParameter->LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6], 0, PACKET_MAXSIZE);
-	memset(GlobalRunningStatusParameter->LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4], 0, PACKET_MAXSIZE);
+	memset(GlobalRunningStatusParameter->LocalAddress_Response[NETWORK_LAYER_TYPE_IPV6], 0, NORMAL_PACKET_MAXSIZE);
+	memset(GlobalRunningStatusParameter->LocalAddress_Response[NETWORK_LAYER_TYPE_IPV4], 0, NORMAL_PACKET_MAXSIZE);
 
 	return;
 }
@@ -1404,7 +1410,7 @@ GlobalStatus::~GlobalStatus(
 	void)
 {
 //Close all sockets.
-	for (const auto &SocketIter:*LocalListeningSocket)
+	for (auto &SocketIter:*LocalListeningSocket)
 		SocketSetting(SocketIter, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
 
 #if defined(PLATFORM_WIN)
@@ -1556,6 +1562,7 @@ OutputPacketTable::OutputPacketTable(
 {
 //Initialization
 	memset(&SocketData_Input, 0, sizeof(SocketData_Input));
+	SocketData_Input.Socket = INVALID_SOCKET;
 	Protocol_Network = 0;
 	Protocol_Transport = 0;
 	ClearPortTime = 0;
@@ -1715,7 +1722,7 @@ DNSCurveConfigurationTable::DNSCurveConfigurationTable(
 DNSCurveConfigurationTable::DNSCurveConfigurationTable(
 	const DNSCurveConfigurationTable &Reference)
 {
-//Check itself.
+//Reference check
 	if (this == &Reference)
 		return;
 
@@ -2179,7 +2186,7 @@ void DNSCurveConfigurationTableSetting(
 	sodium_memzero(DNSCurveConfigurationParameter->DNSCurve_Target_Server_Alternate_IPv6.SendMagicNumber, DNSCURVE_MAGIC_QUERY_LEN);
 	sodium_memzero(DNSCurveConfigurationParameter->DNSCurve_Target_Server_Main_IPv4.SendMagicNumber, DNSCURVE_MAGIC_QUERY_LEN);
 	sodium_memzero(DNSCurveConfigurationParameter->DNSCurve_Target_Server_Alternate_IPv4.SendMagicNumber, DNSCURVE_MAGIC_QUERY_LEN);
-	
+
 //Default settings
 	//[DNSCurve] block
 	DNSCurveConfigurationParameter->DNSCurveProtocol_Network = REQUEST_MODE_NETWORK::BOTH;
@@ -2285,6 +2292,20 @@ void DNSCurveConfigurationTable::SetToMonitorItem(
 	void)
 {
 //Delete and reset pointers.
+	delete DatabaseName;
+	DatabaseName = nullptr;
+#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	delete MBS_DatabaseName;
+	MBS_DatabaseName = nullptr;
+#endif
+	delete Database_Target_Server_Main_IPv6;
+	delete Database_Target_Server_Alternate_IPv6;
+	delete Database_Target_Server_Main_IPv4;
+	delete Database_Target_Server_Alternate_IPv4;
+	Database_Target_Server_Main_IPv6 = nullptr;
+	Database_Target_Server_Alternate_IPv6 = nullptr;
+	Database_Target_Server_Main_IPv4 = nullptr;
+	Database_Target_Server_Alternate_IPv4 = nullptr;
 	delete[] DNSCurve_Target_Server_Main_IPv6.ProviderName;
 	delete[] DNSCurve_Target_Server_Alternate_IPv6.ProviderName;
 	delete[] DNSCurve_Target_Server_Main_IPv4.ProviderName;
@@ -2505,7 +2526,9 @@ OpenSSLContextTable::OpenSSLContextTable(
 	MethodContext = nullptr;
 	SessionBIO = nullptr;
 	SessionData = nullptr;
-	Protocol = 0;
+	Protocol_Network = 0;
+	Protocol_Transport = 0;
+	Socket = INVALID_SOCKET;
 
 	return;
 }
@@ -2518,6 +2541,8 @@ OpenSSLContextTable::~OpenSSLContextTable(
 		BIO_free_all(SessionBIO);
 	if (MethodContext != nullptr)
 		SSL_CTX_free(MethodContext);
+	if (SocketSetting(Socket, SOCKET_SETTING_TYPE::INVALID_CHECK, false, nullptr))
+		SocketSetting(Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
 
 	return;
 }

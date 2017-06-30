@@ -166,22 +166,26 @@ size_t DNSCurve_TCP_RequestSingle(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
-	const size_t RecvSize);
+	const size_t RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 size_t DNSCurve_TCP_RequestMultiple(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
-	const size_t RecvSize);
+	const size_t RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 size_t DNSCurve_UDP_RequestSingle(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
-	const size_t RecvSize);
+	const size_t RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 size_t DNSCurve_UDP_RequestMultiple(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
-	const size_t RecvSize);
+	const size_t RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 #endif
 
 //Monitor.h
@@ -205,7 +209,7 @@ bool FirewallTest(
 	ssize_t &ErrorCode);
 #endif
 bool SocketSetting(
-	const SYSTEM_SOCKET Socket, 
+	SYSTEM_SOCKET &Socket, 
 	const SOCKET_SETTING_TYPE SettingType, 
 	const bool IsPrintError, 
 	void * const DataPointer);
@@ -223,7 +227,7 @@ bool SelectTargetSocketMultiple(
 	std::vector<SOCKET_DATA> &TargetSocketDataList);
 size_t SocketConnecting(
 	const uint16_t Protocol, 
-	const SYSTEM_SOCKET Socket, 
+	SYSTEM_SOCKET &Socket, 
 	const sockaddr * const SockAddr, 
 	const socklen_t AddrLen, 
 	const uint8_t * const OriginalSend, 
@@ -237,7 +241,8 @@ ssize_t SocketSelectingOnce(
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
 	const size_t RecvSize, 
-	ssize_t * const ErrorCode);
+	ssize_t * const ErrorCode, 
+	const SOCKET_DATA * const LocalSocketData);
 size_t SocketSelectingSerial(
 	const REQUEST_PROCESS_TYPE RequestType, 
 	const uint16_t Protocol, 
@@ -293,7 +298,8 @@ bool Add_EDNS_To_Additional_RR(
 	const SOCKET_DATA * const LocalSocketData);
 size_t MakeCompressionPointerMutation(
 	uint8_t * const Buffer, 
-	const size_t Length);
+	const size_t Length, 
+	const size_t MaxLen);
 
 //PrintLog.h
 bool PrintError(
@@ -350,10 +356,17 @@ bool SendToRequester(
 	uint8_t * const RecvBuffer, 
 	const size_t RecvSize, 
 	const size_t MaxLen, 
-	const SOCKET_DATA &LocalSocketData);
+	SOCKET_DATA &LocalSocketData);
 bool MarkDomainCache(
 	const uint8_t * const Buffer, 
-	const size_t Length);
+	const size_t Length, 
+	const SOCKET_DATA * const LocalSocketData);
+size_t CheckDomainCache(
+	uint8_t * const Result, 
+	const size_t ResultSize, 
+	const std::string &Domain, 
+	const dns_qry * const DNS_Query, 
+	const SOCKET_DATA &LocalSocketData);
 
 //Protocol.h
 bool AddressStringToBinary(
@@ -376,13 +389,17 @@ bool CheckSpecialAddress(
 	void * const OriginalAddr, 
 	const bool IsPrivateUse, 
 	const uint8_t * const DomainBuffer);
+bool OperationModeFilter(
+	const uint16_t Protocol, 
+	const void * const OriginalAddr, 
+	const LISTEN_MODE OperationMode);
 size_t CheckQueryNameLength(
 	const uint8_t * const Buffer);
 bool CheckQueryData(
 	DNS_PACKET_DATA * const Packet, 
 	uint8_t * const SendBuffer, 
 	const size_t SendSize, 
-	const SOCKET_DATA &LocalSocketData);
+	SOCKET_DATA &LocalSocketData);
 bool CheckConnectionStreamFin(
 	const REQUEST_PROCESS_TYPE RequestType, 
 	const uint8_t * const Stream, 
@@ -399,17 +416,20 @@ size_t SOCKS_TCP_Request(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	std::unique_ptr<uint8_t[]> &OriginalRecv, 
-	size_t &RecvSize);
+	size_t &RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 size_t SOCKS_UDP_Request(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	std::unique_ptr<uint8_t[]> &OriginalRecv, 
-	size_t &RecvSize);
+	size_t &RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 size_t HTTP_CONNECT_Request(
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	std::unique_ptr<uint8_t[]> &OriginalRecv, 
-	size_t &RecvSize);
+	size_t &RecvSize, 
+	const SOCKET_DATA &LocalSocketData);
 
 //Request.h
 #if defined(ENABLE_PCAP)
@@ -424,13 +444,15 @@ size_t TCP_RequestSingle(
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
 	const size_t RecvSize, 
-	const ADDRESS_UNION_DATA * const SpecifieTargetData);
+	const ADDRESS_UNION_DATA * const SpecifieTargetData, 
+	const SOCKET_DATA * const LocalSocketData);
 size_t TCP_RequestMultiple(
 	const REQUEST_PROCESS_TYPE RequestType, 
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
-	const size_t RecvSize);
+	const size_t RecvSize, 
+	const SOCKET_DATA * const LocalSocketData);
 #if defined(ENABLE_PCAP)
 size_t UDP_RequestSingle(
 	const REQUEST_PROCESS_TYPE RequestType, 
@@ -451,13 +473,15 @@ size_t UDP_CompleteRequestSingle(
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
 	const size_t RecvSize, 
-	const ADDRESS_UNION_DATA * const SpecifieTargetData);
+	const ADDRESS_UNION_DATA * const SpecifieTargetData, 
+	const SOCKET_DATA * const LocalSocketData);
 size_t UDP_CompleteRequestMultiple(
 	const REQUEST_PROCESS_TYPE RequestType, 
 	const uint8_t * const OriginalSend, 
 	const size_t SendSize, 
 	uint8_t * const OriginalRecv, 
-	const size_t RecvSize);
+	const size_t RecvSize, 
+	const SOCKET_DATA * const LocalSocketData);
 
 //Service.h
 bool CheckProcessExists(

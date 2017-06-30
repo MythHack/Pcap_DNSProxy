@@ -1,29 +1,63 @@
-﻿Pcap_DNSProxy 0.4.8.5-0.4.8.7 更新日志(2017-05-01)：
+﻿Pcap_DNSProxy 0.4.9.1 更新日志(2017-06-25)：
 
-* 添加对 DNSCrypt 数据库文件 dnscrypt-resolvers.csv 配置的支持 [rampageX]
+* 添加 Domain Test 探测模块对 TCP 协议的支持
+  * 添加 Domain Test Protocol 参数
+* 修正对 TCP 报文的探测过滤算法
+* 修复 Local Hosts 白名单识别算法的问题 [cjjdaq/muink]
+* 修复 Transaction ID 在取特殊值的情况时无法进行解析的问题 [LisonFan]
+* 修复 NSCI 系统网络感应指示器 IPv6 地址被错误过滤的问题 (Windows) [hnsylzg]
+* Release Hash: 
+  * SHA-3(256): 
+    * Windows/Pcap_DNSProxy.exe: 338A8E24E121E44B9F05F2521D3015B5DE8EA99C62A3A262715CF89740FB7EFC
+    * Windows/Pcap_DNSProxy_x86.exe: EE0A30C8A38D08403A28E91B9E68F67A6556AEBF0EB383FC4BDE03F9795C7544
+    * Windows/Pcap_DNSProxy_XP.exe: 17AB5CD04BF81CDBF964F6156AFEEF12661C9B7A34E44BD5E7D9ED7111C82192
+    * macOS/Pcap_DNSProxy: 3899146F9352F74AF9C7E3D7BFD54DE3B9A13EF41FD8E9F5D05677BE8BA5635B
+  * SHA-2(256): 
+    * Windows/Pcap_DNSProxy.exe: E3BA2F3BF37789E016C2FE240EE8DD1044295A03AF40D178E84504B73F3859D0
+    * Windows/Pcap_DNSProxy_x86.exe: 3EDCBDBFB3356C518B956F32464844B9E6A2FC1830FF9572D3D0FBC1AA454C30
+    * Windows/Pcap_DNSProxy_XP.exe: 560E74741C29F3EC475A4094E09F2EC1B47F7EA0143B7C8633A3BD93D1A6E3BF
+    * macOS/Pcap_DNSProxy: D8E24BE281D44E74A0FCBC627978FC2DC1FD9FA359F65E9DA26DBA3A4002053A
+
+
+-------------------------------------------------------------------------------
+
+
+Pcap_DNSProxy 0.4.8.5-0.4.9.0 更新日志(2017-06-03)：
+
+* 添加对根据请求来源 IP 地址有别的 DNS 缓存/每个前缀地址拥有单独 DNS 缓存队列的支持 [LisonFan]
+  * 添加 Cache Single IPv4 Address Prefix 参数
+  * 添加 Cache Single IPv6 Address Prefix 参数
+* 添加对 EDNS Client Subnet Relay 启用时前缀长度跟随固定地址的功能 [LisonFan]
+* 添加对 DNSCrypt 数据库文件 dnscrypt-resolvers.csv 配置的支持 [rampageX/snakwu]
 * 添加对 HTTP CONNECT 隧道 HTTP/2 版本的支持 [agentmario]
+* 添加对 Force TCP/UDP 参数的支持，可强制请求过程只使用所指定的 TCP/UDP 协议
 * 添加对 TLS ALPN 扩展的支持
+* 添加对 ServiceControl.bat 启动参数的支持，可直接通过在启动时指定参数进行对应的操作 (Windows)
 * 添加对指定 TCP Fast Open 的监听队列长度支持 (Linux)
 * 添加对 TCP Fast Open 的支持 (macOS)
 * LibSodium 库更新到 1.0.12 (Windows/macOS)
 * Visual Studio 更新到 2017 (Windows)
+* 修复读取文本文件时最后一个字符为有效字符但被忽略的问题 [冰靈曦曉]
 * 修复在完全禁用 IPv6 协议栈的情况下程序依旧尝试使用 IPv6 协议栈的问题 [dzxx36gyy]
-* 修复读取 DNSCrypt 数据库文件 dnscrypt-resolvers.csv 机制的问题 [snakwu]
+* 修复 Cache Parameter 参数运作与说明文档不符的问题 [LisonFan]
+* 修复 EDNS Client Subnet 数据包前缀长度截断不符合标准的问题 [LisonFan]
 * 修复 -c/--config-file 参数在部分情况下无法正常指定路径的问题
 * 修复在配置文件重新读取参数有改变的情况下没有进行网络状况重新测试的问题
-* 修复 DNSCurve/DNSCrypt 在配置文件重新读取参数没有改变的情况下可能无法正常工作的问题
+* 修复 DNSCurve(DNSCrypt) 在配置文件重新读取参数没有改变的情况下可能无法正常工作的问题
+* 修复 HTTP CONNECT 隧道在部分服务器先行推送数据时无法正常工作的问题
+* 修复 OpenSSL 在部分情况下无法设置套接字属性的问题 (Linux/macOS)
 * 修复在启用 TCP Fast Open 多线程请求的情况下部分服务器被跳过的问题 (Linux)
-* Release Hash:
-  * SHA-3(256):
-    * Windows/Pcap_DNSProxy.exe: 06A101CD9442A464E47E06D1C7D45DBB8C4063237E9FFA80E35436252A630F4B
-    * Windows/Pcap_DNSProxy_x86.exe: CC2DB27DF9E283B657EA898C8B7F84CC7B5E9F7A85D05EB012FE02B8C79D80E4
-    * Windows/Pcap_DNSProxy_XP.exe: 9A64B2C8CD8028A24CEEBB6C9D28040A7295585E4AC3B65DD95C4FDE895BD33F
-    * macOS/Pcap_DNSProxy: 00D08E044B095DFFE7810DF4CDE1579A711DD87ED5C36024D17819AC01AE2568
-  * SHA-2(256):
-    * Windows/Pcap_DNSProxy.exe: 305444B95D2F9BF296D1A20B14700711678D8161724C72E194303D453F5C3548
-    * Windows/Pcap_DNSProxy_x86.exe: D5436FB5707557E7812387BA09723A8AC3E7809198E80FFDED4C50368CA9629B
-    * Windows/Pcap_DNSProxy_XP.exe: 85D38B0511ABBD596531779944166188BF9CD75B2FAF59BACE7FF88ED6EA5691
-    * macOS/Pcap_DNSProxy: 9F652C7B6EBC9AE922825BD2BF50DB54C7B9413962106FD7E26685953A4C1F70
+* Release Hash: 
+  * SHA-3(256): 
+    * Windows/Pcap_DNSProxy.exe: 55692B5DD0ED42D39091EA7ADB87DA460441D9D18D07D5D87EC3739A5FD6068C
+    * Windows/Pcap_DNSProxy_x86.exe: C943F0BF0691B219CED39B968FF073384DD4C3F5C6B1DF36B5072F1BA6FAFBBE
+    * Windows/Pcap_DNSProxy_XP.exe: E17101A1B7DFA4AB79B4B68FF2A99C9E1260C20D13BCCB9F2ACD9E84C6C82F3A
+    * macOS/Pcap_DNSProxy: 6B13BFED3EEFF32375F1E02CFE19EA4A17DD129CB4245390C698B1F8AFCEDEE0
+  * SHA-2(256): 
+    * Windows/Pcap_DNSProxy.exe: 13AECD65E89913DC3A9AF420872F8DFB67BA52EC1CAC5A6DD4CCCF9FF5A85234
+    * Windows/Pcap_DNSProxy_x86.exe: 090B462C0751C7200A428C261D6AADE3AF455D6A8D0324617D44234C4772225C
+    * Windows/Pcap_DNSProxy_XP.exe: 0998FC56226D9B8327D353366CF8FB04CED233993CFC0A561226DE385934D6B7
+    * macOS/Pcap_DNSProxy: 91AF21E7B704F3894CB1AC658148BBC3019676352BC5F0524BCD2E2176BE3DF8
 
 
 -------------------------------------------------------------------------------
@@ -336,7 +370,7 @@ Pcap_DNSProxy 0.4.3.1-0.4.4 更新日志(2015-09-27)：
 * 添加 Client Ephemeral Key 一次性客户端密钥对功能，增强 DNSCurve 协议传输数据的安全性 [DNSCrypt]
 * 添加对配置文件部分参数的自动刷新功能，具体受支持的参数参见说明文档 [jedisct1/icylogic]
 * 添加 Local Protocol 参数用于指定请求境内服务器时所使用的协议组合 [muink]
-* 添加对十六进制 DNSCurve/DNSCrypt 协议 Magic Number 参数的支持 [BiliBbb]
+* 添加对十六进制 DNSCurve(DNSCrypt) 协议 Magic Number 参数的支持 [BiliBbb]
 * 增强 DNSCurve Protocol 参数对协议组合的支持
 * 增强 NULL 扩展 Hosts 白名单功能的支持，现在可以指定只对部分 DNS 类型生效
 * 添加对 BIND 9.2.0 之后版本清除 DNS 缓存的命令 (Linux) [hongyi-zhao]
@@ -443,7 +477,7 @@ Pcap_DNSProxy 0.4.0.1-0.4.1 更新日志(2015-05-21)：
 Pcap_DNSProxy v0.4(Windows/Linux/Mac) 更新日志(2015-05-13)：
 
 * 添加对 Apple IEEE 1394/FireWire 的支持
-* 添加对 Streamlined/精简 格式 DNSCurve/DNSCrypt 协议的支持
+* 添加对 Streamlined/精简 格式 DNSCurve(DNSCrypt) 协议的支持
   * 提供随机 Curve25519/Salsa20/Poly1305(DNSCurve) 密钥对生成程序 KeyPairGenerator
 * 添加缓存 DNS 回复包的功能
 * 添加切换备用服务器，提供主要服务器和备用服务器自动切换的功能
