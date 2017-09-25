@@ -492,11 +492,11 @@ size_t CheckHostsProcess(
 	}
 
 //Make domain reversed.
-	size_t DataLength = 0;
-	void *DNS_Record = nullptr;
 	std::string ReverseDomain(Domain);
 	MakeStringReversed(ReverseDomain);
 	ReverseDomain.append(".");
+	size_t DataLength = 0;
+	void *DNS_Record = nullptr;
 
 //Domain Name Reservation Considerations for "test."
 //RFC 6761, Special-Use Domain Names(https://tools.ietf.org/html/rfc6761)
@@ -1529,7 +1529,7 @@ bool MarkDomainCache(
 	DNSCacheDataTemp.ClearCacheTime = GetCurrentSystemTime() + ResponseTTL * SECOND_TO_MILLISECOND;
 
 //Single address single cache
-	if (LocalSocketData != nullptr) //Some network test thread do not need to mark request address, put in default queue.
+	if (LocalSocketData != nullptr) //Some network test thread do not need to mark request address, put them in default queue.
 	{
 	//IPv6
 		if (Parameter.DNS_CacheSinglePrefix_IPv6 > 0 && LocalSocketData->SockAddr.ss_family == AF_INET6 && 
