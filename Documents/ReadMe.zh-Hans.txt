@@ -599,7 +599,7 @@ https://sourceforge.net/projects/pcap-dnsproxy
 * Switches - 控制开关区域
   * Domain Case Conversion - 随机转换域名请求大小写：开启为 1 /关闭为 0
   * Compression Pointer Mutation - 随机添加压缩指针：可填入 1 (+ 2 + 3)，关闭为 0
-    * 随机添加压缩指针有3种不同的类型，对应 1 和 2 和 3
+    * 随机添加压缩指针有 3 种不同的类型，对应 1 和 2 和 3
     * 可单独使用其中一个，即只填一个数字，或填入多个，中间使用 + 号连接
     * 填入多个时，当实际需要使用随机添加压缩指针时将随机使用其中的一种，每个请求都有可能不相同
   * EDNS Label - EDNS 标签支持，开启后将为请求添加 EDNS 标签：全部开启为 1 /关闭为 0
@@ -612,19 +612,14 @@ https://sourceforge.net/projects/pcap-dnsproxy
   * DNSSEC Request - DNSSEC 请求，开启后将尝试为所有请求添加 DNSSEC 请求：开启为 1 /关闭为 0
     * 本功能要求启用 EDNS Label 参数
     * 此功能不具备任何验证 DNSSEC 记录的能力，单独开启理论上并不能避免 DNS 投毒污染的问题
-  * DNSSEC Validation - DNSSEC 记录验证功能，将检查所有带有 DNSSEC 记录的域名解析，验证失败将被丢弃：开启为 1 /关闭为 0
+  * DNSSEC Force Record - 强制 DNSSEC 记录验证功能，将丢弃所有支持 DNSSEC 功能但是没有任何 DNSSEC 记录的域名解析：开启为 1 /关闭为 0
     * 本功能要求启用 EDNS Label 和 DNSSEC Request 参数
     * 此功能不具备完整的 DNSSEC 记录检验的能力，单独开启理论上不能避免 DNS 投毒污染的问题
-    * 本功能不检查不存在 DNSSEC 记录的域名解析
-  * DNSSEC Force Validation - 强制 DNSSEC 记录验证功能，将丢弃所有没有 DNSSEC 记录的域名解析：开启为 1 /关闭为 0
-    * 本功能要求启用 EDNS Label、DNSSEC Request 和 DNSSEC Validation 参数
-    * 此功能不具备完整的 DNSSEC 记录检验的能力，单独开启理论上不能避免 DNS 投毒污染的问题
-    * 警告：由于现时已经部署 DNSSEC 的域名数量极少，未部署 DNSSEC 的域名解析没有 DNSSEC 记录，这将导致所有未部署 DNSSEC 的域名解析失败，现阶段切勿开启本功能！
+    * 警告：由于现时已经部署 DNSSEC 的域名数量极少，未部署 DNSSEC 的域名解析没有 DNSSEC 记录，这将导致所有未部署 DNSSEC 的域名解析失败！
   * Alternate Multiple Request - 备用服务器同时请求参数，开启后将同时请求主要服务器和备用服务器并采用最快回应的服务器的结果：开启为 1 /关闭为 0
     * 同时请求多服务器启用后本参数将强制启用，将同时请求所有存在于列表中的服务器，并采用最快回应的服务器的结果
   * IPv4 Do Not Fragment - IPv4 数据包头部 Do Not Fragment 标志：开启为 1 /关闭为 0
     * 本功能不支持 macOS 平台，此平台将直接忽略此参数
-  * IPv4 Data Filter - IPv4 数据包头检测：开启为 1 /关闭为 0
   * TCP Data Filter - TCP 数据包头检测：开启为 1 /关闭为 0
   * DNS Data Filter - DNS 数据包头检测：开启为 1 /关闭为 0
   * Blacklist Filter - 解析结果黑名单过滤：开启为 1 /关闭为 0
@@ -1045,7 +1040,6 @@ IPFilter 配置文件分为 Blacklist/黑名单区域 和 IPFilter/地址过滤�
 * Multiple Request Times
 * Domain Case Conversion
 * IPv4 Do Not Fragment
-* IPv4 Data Filter
 * TCP Data Filter
 * DNS Data Filter
 * Strict Resource Record TTL Filter

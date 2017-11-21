@@ -89,7 +89,7 @@ ConfigurationTable::ConfigurationTable(
 		Local_FQDN_String = new std::string();
 		Local_FQDN_Response = new uint8_t[DOMAIN_MAXSIZE]();
 	#if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
-		LocalServer_Response = new uint8_t[DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + sizeof(dns_record_opt)]();
+		LocalServer_Response = new uint8_t[DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + EDNS_RECORD_MAXSIZE]();
 	#endif
 
 	//[Proxy] block
@@ -190,8 +190,8 @@ ConfigurationTable::ConfigurationTable(
 	return;
 }
 
-//ConfigurationTable class copy constructor
-ConfigurationTable::ConfigurationTable(
+//ConfigurationTable class copy member operator
+void ConfigurationTable::CopyMemberOperator(
 	const ConfigurationTable &Reference)
 {
 //Check itself.
@@ -224,7 +224,7 @@ ConfigurationTable::ConfigurationTable(
 		Local_FQDN_String = new std::string();
 		Local_FQDN_Response = new uint8_t[DOMAIN_MAXSIZE]();
 	#if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
-		LocalServer_Response = new uint8_t[DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + sizeof(dns_record_opt)]();
+		LocalServer_Response = new uint8_t[DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + EDNS_RECORD_MAXSIZE]();
 	#endif
 
 	//[Proxy] block
@@ -486,15 +486,13 @@ ConfigurationTable::ConfigurationTable(
 	EDNS_Switch_UDP = Reference.EDNS_Switch_UDP;
 	EDNS_ClientSubnet_Relay = Reference.EDNS_ClientSubnet_Relay;
 	DNSSEC_Request = Reference.DNSSEC_Request;
-	DNSSEC_Validation = Reference.DNSSEC_Validation;
-	DNSSEC_ForceValidation = Reference.DNSSEC_ForceValidation;
+	DNSSEC_ForceRecord = Reference.DNSSEC_ForceRecord;
 	AlternateMultipleRequest = Reference.AlternateMultipleRequest;
-	DoNotFragment = Reference.DoNotFragment;
+	DoNotFragment_IPv4 = Reference.DoNotFragment_IPv4;
 #if defined(ENABLE_PCAP)
-	HeaderCheck_IPv4 = Reference.HeaderCheck_IPv4;
-	HeaderCheck_TCP = Reference.HeaderCheck_TCP;
+	PacketCheck_TCP = Reference.PacketCheck_TCP;
 #endif
-	HeaderCheck_DNS = Reference.HeaderCheck_DNS;
+	PacketCheck_DNS = Reference.PacketCheck_DNS;
 	DataCheck_Blacklist = Reference.DataCheck_Blacklist;
 	DataCheck_Strict_RR_TTL = Reference.DataCheck_Strict_RR_TTL;
 
@@ -535,7 +533,7 @@ ConfigurationTable::ConfigurationTable(
 	memcpy_s(Local_FQDN_Response, DOMAIN_MAXSIZE, Reference.Local_FQDN_Response, DOMAIN_MAXSIZE);
 	Local_FQDN_Length = Reference.Local_FQDN_Length;
 #if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
-	memcpy_s(LocalServer_Response, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + sizeof(dns_record_opt), Reference.LocalServer_Response, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + sizeof(dns_record_opt));
+	memcpy_s(LocalServer_Response, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + EDNS_RECORD_MAXSIZE, Reference.LocalServer_Response, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + EDNS_RECORD_MAXSIZE);
 	LocalServer_Length = Reference.LocalServer_Length;
 #endif
 
@@ -655,6 +653,22 @@ ConfigurationTable::ConfigurationTable(
 	return;
 }
 
+//ConfigurationTable class copy constructor
+ConfigurationTable::ConfigurationTable(
+	const ConfigurationTable &Reference)
+{
+	CopyMemberOperator(Reference);
+	return;
+}
+
+//ConfigurationTable class operator = overloading
+ConfigurationTable & ConfigurationTable::operator=(
+	const ConfigurationTable &Reference)
+{
+	CopyMemberOperator(Reference);
+	return *this;
+}
+
 //ConfigurationTable class constructor settings
 void ConfigurationTableSetting(
 	CONFIGURATION_TABLE * const ConfigurationParameter)
@@ -666,7 +680,7 @@ void ConfigurationTableSetting(
 #endif
 	memset(ConfigurationParameter->Local_FQDN_Response, 0, DOMAIN_MAXSIZE);
 #if (defined(PLATFORM_WIN) || defined(PLATFORM_LINUX))
-	memset(ConfigurationParameter->LocalServer_Response, 0, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + sizeof(dns_record_opt));
+	memset(ConfigurationParameter->LocalServer_Response, 0, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + EDNS_RECORD_MAXSIZE);
 #endif
 
 //Default value settings
@@ -920,14 +934,14 @@ void ConfigurationTable::MonitorItemToUsing(
 //[Values] block
 	ConfigurationParameter->ThreadPoolResetTime = ThreadPoolResetTime;
 #if defined(ENABLE_PCAP)
-	ConfigurationParameter->Target_Server_Main_IPv6.HopLimitsData_Assign.HopLimit = Target_Server_Main_IPv6.HopLimitsData_Assign.HopLimit;
-	ConfigurationParameter->Target_Server_Main_IPv4.HopLimitsData_Assign.TTL = Target_Server_Main_IPv4.HopLimitsData_Assign.TTL;
-	ConfigurationParameter->Target_Server_Main_IPv6.HopLimitsData_Mark.HopLimit = Target_Server_Main_IPv6.HopLimitsData_Mark.HopLimit;
-	ConfigurationParameter->Target_Server_Main_IPv4.HopLimitsData_Mark.TTL = Target_Server_Main_IPv4.HopLimitsData_Mark.TTL;
-	ConfigurationParameter->Target_Server_Alternate_IPv6.HopLimitsData_Assign.HopLimit = Target_Server_Alternate_IPv6.HopLimitsData_Assign.HopLimit;
-	ConfigurationParameter->Target_Server_Alternate_IPv4.HopLimitsData_Assign.TTL = Target_Server_Alternate_IPv4.HopLimitsData_Assign.TTL;
-	ConfigurationParameter->Target_Server_Alternate_IPv6.HopLimitsData_Mark.HopLimit = Target_Server_Alternate_IPv6.HopLimitsData_Mark.HopLimit;
-	ConfigurationParameter->Target_Server_Alternate_IPv4.HopLimitsData_Mark.TTL = Target_Server_Alternate_IPv4.HopLimitsData_Mark.TTL;
+	ConfigurationParameter->Target_Server_Main_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Assign = Target_Server_Main_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Assign;
+	ConfigurationParameter->Target_Server_Main_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Assign = Target_Server_Main_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Assign;
+	ConfigurationParameter->Target_Server_Main_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Mark = Target_Server_Main_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Mark;
+	ConfigurationParameter->Target_Server_Main_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Mark = Target_Server_Main_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Mark;
+	ConfigurationParameter->Target_Server_Alternate_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Assign = Target_Server_Alternate_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Assign;
+	ConfigurationParameter->Target_Server_Alternate_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Assign = Target_Server_Alternate_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Assign;
+	ConfigurationParameter->Target_Server_Alternate_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Mark = Target_Server_Alternate_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Mark;
+	ConfigurationParameter->Target_Server_Alternate_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Mark = Target_Server_Alternate_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Mark;
 #endif
 	ConfigurationParameter->SocketTimeout_Reliable_Once = SocketTimeout_Reliable_Once;
 	ConfigurationParameter->SocketTimeout_Reliable_Serial = SocketTimeout_Reliable_Serial;
@@ -944,10 +958,9 @@ void ConfigurationTable::MonitorItemToUsing(
 //[Switches] block
 	ConfigurationParameter->DomainCaseConversion = DomainCaseConversion;
 #if defined(ENABLE_PCAP)
-	ConfigurationParameter->HeaderCheck_IPv4 = HeaderCheck_IPv4;
-	ConfigurationParameter->HeaderCheck_TCP = HeaderCheck_TCP;
+	ConfigurationParameter->PacketCheck_TCP = PacketCheck_TCP;
 #endif
-	ConfigurationParameter->HeaderCheck_DNS = HeaderCheck_DNS;
+	ConfigurationParameter->PacketCheck_DNS = PacketCheck_DNS;
 	ConfigurationParameter->DataCheck_Strict_RR_TTL = DataCheck_Strict_RR_TTL;
 
 //[Proxy] block
@@ -1039,14 +1052,14 @@ void ConfigurationTable::MonitorItemReset(
 //[Values] block
 	ThreadPoolResetTime = DEFAULT_THREAD_POOL_RESET_TIME;
 #if defined(ENABLE_PCAP)
-	Target_Server_Main_IPv6.HopLimitsData_Assign.HopLimit = 0;
-	Target_Server_Main_IPv4.HopLimitsData_Assign.TTL = 0;
-	Target_Server_Main_IPv6.HopLimitsData_Mark.HopLimit = 0;
-	Target_Server_Main_IPv4.HopLimitsData_Mark.TTL = 0;
-	Target_Server_Alternate_IPv6.HopLimitsData_Assign.HopLimit = 0;
-	Target_Server_Alternate_IPv4.HopLimitsData_Assign.TTL = 0;
-	Target_Server_Alternate_IPv6.HopLimitsData_Mark.HopLimit = 0;
-	Target_Server_Alternate_IPv4.HopLimitsData_Mark.TTL = 0;
+	Target_Server_Main_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Assign = 0;
+	Target_Server_Main_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Assign = 0;
+	Target_Server_Main_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Mark = 0;
+	Target_Server_Main_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Mark = 0;
+	Target_Server_Alternate_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Assign = 0;
+	Target_Server_Alternate_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Assign = 0;
+	Target_Server_Alternate_IPv6.ServerPacketStatus.NetworkLayerStatus.IPv6_HeaderStatus.HopLimit_Mark = 0;
+	Target_Server_Alternate_IPv4.ServerPacketStatus.NetworkLayerStatus.IPv4_HeaderStatus.TTL_Mark = 0;
 #endif
 #if defined(PLATFORM_WIN)
 	SocketTimeout_Reliable_Once = DEFAULT_RELIABLE_ONCE_SOCKET_TIMEOUT;
@@ -1074,10 +1087,9 @@ void ConfigurationTable::MonitorItemReset(
 //[Switches] block
 	DomainCaseConversion = false;
 #if defined(ENABLE_PCAP)
-	HeaderCheck_IPv4 = false;
-	HeaderCheck_TCP = false;
+	PacketCheck_TCP = false;
 #endif
-	HeaderCheck_DNS = false;
+	PacketCheck_DNS = false;
 	DataCheck_Strict_RR_TTL = false;
 
 //[Proxy] block
@@ -1177,8 +1189,8 @@ GlobalStatus::GlobalStatus(
 	return;
 }
 
-//GlobalStatus class copy constructor
-GlobalStatus::GlobalStatus(
+//GlobalStatus class copy member operator
+void GlobalStatus::CopyMemberOperator(
 	const GlobalStatus &Reference)
 {
 //Check itself.
@@ -1383,6 +1395,22 @@ GlobalStatus::GlobalStatus(
 	ConfigFileModifiedTime = Reference.ConfigFileModifiedTime;
 
 	return;
+}
+
+//GlobalStatus class copy constructor
+GlobalStatus::GlobalStatus(
+	const GlobalStatus &Reference)
+{
+	CopyMemberOperator(Reference);
+	return;
+}
+
+//GlobalStatus class operator = overloading
+GlobalStatus & GlobalStatus::operator=(
+	const GlobalStatus &Reference)
+{
+	CopyMemberOperator(Reference);
+	return *this;
 }
 
 //GlobalStatus class constructor settings
@@ -1617,6 +1645,13 @@ OutputPacketTable::OutputPacketTable(
 DNSCurveConfigurationTable::DNSCurveConfigurationTable(
 	void)
 {
+//Libsodium ramdom bytes initialization
+//randombytes_set_implementation function should only be called once, before sodium_init().
+//No need to set a custom RNG, please visit https://download.libsodium.org/doc/advanced/custom_rng.html.
+/*	randombytes_set_implementation(&randombytes_salsa20_implementation);
+	randombytes_stir();
+*/
+
 //Libsodium initialization
 	if (sodium_init() == LIBSODIUM_ERROR)
 	{
@@ -1758,8 +1793,8 @@ DNSCurveConfigurationTable::DNSCurveConfigurationTable(
 	return;
 }
 
-//DNSCurveConfigurationTable class copy constructor
-DNSCurveConfigurationTable::DNSCurveConfigurationTable(
+//DNSCurveConfigurationTable class copy member operator
+void DNSCurveConfigurationTable::CopyMemberOperator(
 	const DNSCurveConfigurationTable &Reference)
 {
 //Reference check
@@ -2189,6 +2224,22 @@ DNSCurveConfigurationTable::DNSCurveConfigurationTable(
 	}
 
 	return;
+}
+
+//DNSCurveConfigurationTable class copy constructor
+DNSCurveConfigurationTable::DNSCurveConfigurationTable(
+	const DNSCurveConfigurationTable &Reference)
+{
+	CopyMemberOperator(Reference);
+	return;
+}
+
+//DNSCurveConfigurationTable class operator = overloading
+DNSCurveConfigurationTable & DNSCurveConfigurationTable::operator=(
+	const DNSCurveConfigurationTable &Reference)
+{
+	CopyMemberOperator(Reference);
+	return *this;
 }
 
 //DNSCurveConfigurationTable class constructor settings
