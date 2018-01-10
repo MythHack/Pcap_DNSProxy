@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,8 +29,8 @@ bool ReadText(
 	const size_t FileIndex)
 {
 //Initialization
-	std::unique_ptr<uint8_t[]> FileBuffer(new uint8_t[FILE_BUFFER_SIZE + PADDING_RESERVED_BYTES]());
-	std::unique_ptr<uint8_t[]> TextBuffer(new uint8_t[FILE_BUFFER_SIZE + PADDING_RESERVED_BYTES]());
+	const auto FileBuffer = std::make_unique<uint8_t[]>(FILE_BUFFER_SIZE + PADDING_RESERVED_BYTES);
+	const auto TextBuffer = std::make_unique<uint8_t[]>(FILE_BUFFER_SIZE + PADDING_RESERVED_BYTES);
 	memset(FileBuffer.get(), 0, FILE_BUFFER_SIZE + PADDING_RESERVED_BYTES);
 	memset(TextBuffer.get(), 0, FILE_BUFFER_SIZE + PADDING_RESERVED_BYTES);
 	std::string TextData;
@@ -528,7 +528,7 @@ bool ReadParameter(
 				}
 				else {
 					FileList_Config.at(FileIndex).ModificationTime = 0;
-					continue;
+//					continue;
 				}
 			}
 			else {
@@ -540,8 +540,8 @@ bool ReadParameter(
 				//Stop reading.
 					if (IsFirstRead)
 						return false;
-					else 
-						continue;
+//					else 
+//						continue;
 				}
 				else {
 					fclose(FileHandle);
@@ -627,7 +627,7 @@ bool ReadParameter(
 					if (!IsFirstRead)
 						FileList_DNSCurveDatabase.at(FileIndex).ModificationTime = 0;
 
-					continue;
+//					continue;
 				}
 				else {
 					if (!ReadText(FileHandle, ReadDNSCurveTextType, FileIndex))
@@ -635,7 +635,7 @@ bool ReadParameter(
 						fclose(FileHandle);
 						FileHandle = nullptr;
 
-						continue;
+//						continue;
 					}
 					else {
 						fclose(FileHandle);

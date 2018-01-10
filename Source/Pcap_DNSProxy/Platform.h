@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,7 +25,7 @@
 // 
 /* This code is from Qt source, which in /src/corelib/global/qsystemdetection.h header file, please visit https://www.qt.io/developers.
 
-   The operating system, must be one of: (PLATFOEM_x)
+   The operating system, must be one of: (PLATFORM_x)
 
      DARWIN   - Any Darwin system (macOS, iOS, watchOS, tvOS)
      MACOS    - macOS
@@ -599,7 +599,6 @@
 #endif
 	#define SOCKET_ERROR             (-1)
 	#define TRUE                     1U
-	#define RETURN_ERROR             (-1)
 	#define SD_BOTH                  SHUT_RDWR
 	#define SD_RECV                  SHUT_RD
 	#define SD_SEND                  SHUT_WR

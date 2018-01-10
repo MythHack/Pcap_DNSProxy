@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -253,12 +253,12 @@ bool Parameter_CheckSetting(
 		if (Parameter.EDNS_PayloadSize < DNS_PACKET_MAXSIZE_TRADITIONAL)
 		{
 			PrintError(LOG_LEVEL_TYPE::LEVEL_3, LOG_ERROR_TYPE::NOTICE, L"EDNS Payload Size must longer than traditional DNS packet minimum supported size(512 bytes)", 0, FileList_Config.at(FileIndex).FileName.c_str(), 0);
-			return false;
+			Parameter.EDNS_PayloadSize = DNS_PACKET_MAXSIZE_TRADITIONAL;
 		}
-		else if (Parameter.EDNS_PayloadSize >= NORMAL_PACKET_MAXSIZE - sizeof(ipv6_hdr) - sizeof(udp_hdr))
+		else if (Parameter.EDNS_PayloadSize > EDNS_PACKET_MAXSIZE)
 		{
 			PrintError(LOG_LEVEL_TYPE::LEVEL_3, LOG_ERROR_TYPE::NOTICE, L"EDNS Payload Size is too large", 0, FileList_Config.at(FileIndex).FileName.c_str(), 0);
-			Parameter.EDNS_PayloadSize = EDNS_PACKET_MINSIZE;
+			Parameter.EDNS_PayloadSize = EDNS_PACKET_MAXSIZE;
 		}
 	}
 
@@ -451,7 +451,7 @@ bool Parameter_CheckSetting(
 			Parameter.LocalServer_Length += sizeof(dns_record_ptr);
 
 		//Copy to global buffer.
-			memcpy_s(Parameter.LocalServer_Response + Parameter.LocalServer_Length, DOMAIN_MAXSIZE + sizeof(dns_record_ptr) + EDNS_RECORD_MAXSIZE - Parameter.LocalServer_Length, Parameter.Local_FQDN_Response, Parameter.Local_FQDN_Length);
+			memcpy_s(Parameter.LocalServer_Response + Parameter.LocalServer_Length, NORMAL_PACKET_MAXSIZE - Parameter.LocalServer_Length, Parameter.Local_FQDN_Response, Parameter.Local_FQDN_Length);
 			Parameter.LocalServer_Length += Parameter.Local_FQDN_Length;
 		}
 	#endif
@@ -2606,8 +2606,19 @@ bool ReadParameterData(
 		{
 			CaseConvert(Data, true);
 
+		//Process selection mode
+			auto IsExclusionMode = true;
+			if (Data.find(ASCII_MINUS) != std::string::npos)
+			{
+				if (Data.find(ASCII_PLUS) != std::string::npos)
+					goto PrintDataFormatError;
+				else 
+					IsExclusionMode = false;
+			}
+
 		//Process mode check
-			if (Data.compare(0, strlen("EDNSLABEL=1"), ("EDNSLABEL=1")) == 0)
+			if (Data.compare(0, strlen("EDNSLABEL=1"), ("EDNSLABEL=1")) == 0 || 
+				Data.compare(0, strlen("EDNSLABEL=ALL"), ("EDNSLABEL=ALL")) == 0)
 			{
 			//Enable all process
 				Parameter.EDNS_Label = true;
@@ -2621,13 +2632,6 @@ bool ReadParameterData(
 				Parameter.EDNS_Switch_TCP = true;
 				Parameter.EDNS_Switch_UDP = true;
 			}
-
-		//Process selection mode
-			if (Data.find(ASCII_PLUS) != std::string::npos && Data.find(ASCII_MINUS) != std::string::npos)
-				goto PrintDataFormatError;
-			auto IsExclusionMode = true;
-			if (Data.find(ASCII_MINUS) != std::string::npos)
-				IsExclusionMode = false;
 
 		//Local request process
 			if (Data.find("LOCAL") != std::string::npos)
@@ -2644,7 +2648,8 @@ bool ReadParameterData(
 			}
 
 		//HTTP CONNECT Proxy request process
-			if (Data.find("HTTP CONNECT") != std::string::npos)
+			if (Data.find("HTTP") != std::string::npos && Data.find("CONNECT") != std::string::npos && 
+				Data.find("HTTP") < Data.find("CONNECT"))
 			{
 				Parameter.EDNS_Label = true;
 				Parameter.EDNS_Switch_HTTP_CONNECT = IsExclusionMode;
@@ -2659,7 +2664,8 @@ bool ReadParameterData(
 
 		//DNSCurve request process
 		#if defined(ENABLE_LIBSODIUM)
-			if (Data.find("DNSCURVE") != std::string::npos || Data.find("DNSCRYPT") != std::string::npos)
+			if (Data.find("DNSCURVE") != std::string::npos || 
+				Data.find("DNSCRYPT") != std::string::npos)
 			{
 				Parameter.EDNS_Label = true;
 				Parameter.EDNS_Switch_DNSCurve = IsExclusionMode;
@@ -2717,10 +2723,6 @@ bool ReadParameterData(
 	else if (IsFirstRead && Data.compare(0, strlen("BlacklistFilter=1"), ("BlacklistFilter=1")) == 0)
 	{
 		Parameter.DataCheck_Blacklist = true;
-	}
-	else if (Data.compare(0, strlen("StrictResourceRecordTTLFilter=1"), ("StrictResourceRecordTTLFilter=1")) == 0)
-	{
-		ParameterPointer->DataCheck_Strict_RR_TTL = true;
 	}
 
 //[Data] block
@@ -2808,7 +2810,7 @@ bool ReadParameterData(
 		{
 			if (Data.length() > strlen("LocalMachineServerName=") + DOMAIN_MINSIZE && Data.length() < strlen("LocalMachineServerName=") + DOMAIN_DATA_MAXSIZE)
 			{
-				std::unique_ptr<uint8_t[]> FQDN_String(new uint8_t[NI_MAXHOST + PADDING_RESERVED_BYTES]());
+				const auto FQDN_String = std::make_unique<uint8_t[]>(NI_MAXHOST + PADDING_RESERVED_BYTES);
 				memset(FQDN_String.get(), 0, NI_MAXHOST + PADDING_RESERVED_BYTES);
 				Parameter.Local_FQDN_Length = Data.length() - strlen("LocalMachineServerName=");
 				memcpy_s(FQDN_String.get(), NI_MAXHOST, Data.c_str() + strlen("LocalMachineServerName="), Parameter.Local_FQDN_Length);
@@ -2920,7 +2922,7 @@ bool ReadParameterData(
 	else if (Data.compare(0, strlen("SOCKSUsername="), ("SOCKSUsername=")) == 0 && 
 		Data.length() > strlen("SOCKSUsername="))
 	{
-		if (Data.length() > strlen("SOCKSUsername=") + SOCKS_USERNAME_PASSWORD_MAXNUM)
+		if (Data.length() < strlen("SOCKSUsername=") + SOCKS_USERNAME_PASSWORD_MAXNUM)
 		{
 			ParameterPointer->SOCKS_Username->clear();
 			ParameterPointer->SOCKS_Username->append(Data, strlen("SOCKSUsername="), Data.length() - strlen("SOCKSUsername="));
@@ -2932,7 +2934,7 @@ bool ReadParameterData(
 	else if (Data.compare(0, strlen("SOCKSPassword="), ("SOCKSPassword=")) == 0 && 
 		Data.length() > strlen("SOCKSPassword="))
 	{
-		if (Data.length() > strlen("SOCKSPassword=") + SOCKS_USERNAME_PASSWORD_MAXNUM)
+		if (Data.length() < strlen("SOCKSPassword=") + SOCKS_USERNAME_PASSWORD_MAXNUM)
 		{
 			ParameterPointer->SOCKS_Password->clear();
 			ParameterPointer->SOCKS_Password->append(Data, strlen("SOCKSPassword="), Data.length() - strlen("SOCKSPassword="));
@@ -3147,7 +3149,7 @@ bool ReadParameterData(
 	else if (Data.compare(0, strlen("HTTPCONNECTProxyAuthorization="), ("HTTPCONNECTProxyAuthorization=")) == 0 && 
 		Data.length() > strlen("HTTPCONNECTProxyAuthorization="))
 	{
-		std::unique_ptr<uint8_t[]> ProxyAuthorization(new uint8_t[BASE64_ENCODE_OUT_SIZE(Data.length() - strlen("HTTPCONNECTProxyAuthorization=")) + PADDING_RESERVED_BYTES]());
+		const auto ProxyAuthorization = std::make_unique<uint8_t[]>(BASE64_ENCODE_OUT_SIZE(Data.length() - strlen("HTTPCONNECTProxyAuthorization=")) + PADDING_RESERVED_BYTES);
 		memset(ProxyAuthorization.get(), 0, BASE64_ENCODE_OUT_SIZE(Data.length() - strlen("HTTPCONNECTProxyAuthorization=")) + PADDING_RESERVED_BYTES);
 		Base64_Encode(reinterpret_cast<uint8_t *>(const_cast<char *>(Data.c_str() + strlen("HTTPCONNECTProxyAuthorization="))), Data.length() - strlen("HTTPCONNECTProxyAuthorization="), ProxyAuthorization.get(), BASE64_ENCODE_OUT_SIZE(Data.length() - strlen("HTTPCONNECTProxyAuthorization=")));
 		*ParameterPointer->HTTP_CONNECT_ProxyAuthorization = ("Basic ");

@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -738,8 +738,8 @@ bool UDP_Monitor(
 	SOCKET_DATA LocalSocketData)
 {
 //Initialization
-	std::unique_ptr<uint8_t[]> RecvBuffer(new uint8_t[(NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES) * Parameter.ThreadPoolMaxNum]());
-	std::unique_ptr<uint8_t[]> SendBuffer(new uint8_t[NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES]());
+	const auto RecvBuffer = std::make_unique<uint8_t[]>((NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES) * Parameter.ThreadPoolMaxNum);
+	const auto SendBuffer = std::make_unique<uint8_t[]>(NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
 	memset(RecvBuffer.get(), 0, (NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES) * Parameter.ThreadPoolMaxNum);
 	memset(SendBuffer.get(), 0, NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
 	MONITOR_QUEUE_DATA MonitorQueryData;
@@ -1051,7 +1051,7 @@ bool TCP_AcceptProcess(
 	}
 
 //Initialization(Part 1)
-	std::unique_ptr<uint8_t[]> RecvBuffer(new uint8_t[Parameter.LargeBufferSize + PADDING_RESERVED_BYTES]());
+	const auto RecvBuffer = std::make_unique<uint8_t[]>(Parameter.LargeBufferSize + PADDING_RESERVED_BYTES);
 	memset(RecvBuffer.get(), 0, Parameter.LargeBufferSize + PADDING_RESERVED_BYTES);
 	fd_set ReadFDS;
 	timeval Timeout;
@@ -1208,7 +1208,7 @@ bool TCP_AcceptProcess(
 		MonitorQueryData.first.EDNS_RequesterPayload = 0;
 
 	//Check DNS query data.
-		std::unique_ptr<uint8_t[]> SendBuffer(new uint8_t[Parameter.LargeBufferSize + PADDING_RESERVED_BYTES]());
+		auto SendBuffer = std::make_unique<uint8_t[]>(Parameter.LargeBufferSize + PADDING_RESERVED_BYTES);
 		memset(SendBuffer.get(), 0, Parameter.LargeBufferSize + PADDING_RESERVED_BYTES);
 		if (!CheckQueryData(&MonitorQueryData.first, SendBuffer.get(), Parameter.LargeBufferSize, MonitorQueryData.second))
 		{
@@ -1403,6 +1403,7 @@ void GetGatewayInformation(
 {
 	if (Protocol == AF_INET6)
 	{
+	//Gateway status from configure.
 		if (Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family == 0 && 
 			Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family == 0 && 
 			Parameter.Target_Server_Local_Main_IPv6.Storage.ss_family == 0 && 
@@ -1416,7 +1417,9 @@ void GetGatewayInformation(
 			GlobalRunningStatus.GatewayAvailable_IPv6 = false;
 			return;
 		}
+
 	#if defined(PLATFORM_WIN)
+	//Gateway status from system network stack.
 		DWORD AdaptersIndex = 0;
 		if ((Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
@@ -1465,6 +1468,7 @@ void GetGatewayInformation(
 			}
 		}
 	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	//Gateway status from system network stack.
 		if ((Parameter.Target_Server_Main_IPv6.AddressData.Storage.ss_family != 0 && 
 			!GetBestInterfaceAddress(AF_INET6, &Parameter.Target_Server_Main_IPv6.AddressData.Storage)) || 
 			(Parameter.Target_Server_Alternate_IPv6.AddressData.Storage.ss_family != 0 && 
@@ -1503,6 +1507,7 @@ void GetGatewayInformation(
 	}
 	else if (Protocol == AF_INET)
 	{
+	//Gateway status from configure.
 		if (Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family == 0 && 
 			Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family == 0 && 
 			Parameter.Target_Server_Local_Main_IPv4.Storage.ss_family == 0 && 
@@ -1516,7 +1521,9 @@ void GetGatewayInformation(
 			GlobalRunningStatus.GatewayAvailable_IPv4 = false;
 			return;
 		}
+
 	#if defined(PLATFORM_WIN)
+	//Gateway status from system network stack.
 		DWORD AdaptersIndex = 0;
 		if ((Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
 			GetBestInterfaceEx(
@@ -1565,6 +1572,7 @@ void GetGatewayInformation(
 			}
 		}
 	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	//Gateway status from system network stack.
 		if ((Parameter.Target_Server_Main_IPv4.AddressData.Storage.ss_family != 0 && 
 			!GetBestInterfaceAddress(AF_INET, &Parameter.Target_Server_Main_IPv4.AddressData.Storage)) || 
 			(Parameter.Target_Server_Alternate_IPv4.AddressData.Storage.ss_family != 0 && 

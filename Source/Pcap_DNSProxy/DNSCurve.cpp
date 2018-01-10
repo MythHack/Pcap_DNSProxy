@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -362,7 +362,7 @@ void DNSCurveSocketPrecomputation(
 				!SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::NON_BLOCKING_MODE, true, nullptr) || 
 				(IsIPv6 && !SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV6, true, nullptr)) || 
 				(!IsIPv6 && (!SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-				!SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))))
+				(InnerProtocol == IPPROTO_UDP && !SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))))
 			{
 				for (auto &SocketDataIter:SocketDataList)
 					SocketSetting(SocketDataIter.Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
@@ -410,7 +410,7 @@ void DNSCurveSocketPrecomputation(
 	//Make encryption or normal packet of Main server.
 		if (DNSCurveParameter.IsEncryption || Protocol == IPPROTO_TCP)
 		{
-			std::unique_ptr<uint8_t[]> SendBufferTemp(new uint8_t[RecvSize + PADDING_RESERVED_BYTES]());
+			auto SendBufferTemp = std::make_unique<uint8_t[]>(RecvSize + PADDING_RESERVED_BYTES);
 			sodium_memzero(SendBufferTemp.get(), RecvSize + PADDING_RESERVED_BYTES);
 			std::swap(SendBuffer, SendBufferTemp);
 			DataLength = DNSCurvePacketEncryption(Protocol, (*PacketTarget)->SendMagicNumber, Client_PublicKey, *PrecomputationKey, OriginalSend, SendSize, SendBuffer.get(), RecvSize);
@@ -489,7 +489,7 @@ SkipMain:
 				!SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::NON_BLOCKING_MODE, true, nullptr) || 
 				(IsIPv6 && !SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV6, true, nullptr)) || 
 				(!IsIPv6 && (!SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-				!SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))))
+				(Protocol == IPPROTO_UDP && !SocketSetting(SocketDataTemp.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))))
 			{
 				for (auto &SocketDataIter:SocketDataList)
 					SocketSetting(SocketDataIter.Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
@@ -547,7 +547,7 @@ SkipMain:
 	//Make encryption or normal packet of Alternate server.
 		if (DNSCurveParameter.IsEncryption)
 		{
-			std::unique_ptr<uint8_t[]> SendBufferTemp(new uint8_t[RecvSize + PADDING_RESERVED_BYTES]());
+			auto SendBufferTemp = std::make_unique<uint8_t[]>(RecvSize + PADDING_RESERVED_BYTES);
 			sodium_memzero(SendBufferTemp.get(), RecvSize + PADDING_RESERVED_BYTES);
 			std::swap(Alternate_SendBuffer, SendBufferTemp);
 			SendBufferTemp.reset();
@@ -609,7 +609,7 @@ size_t DNSCurvePacketEncryption(
 		std::unique_ptr<uint8_t[]> Buffer(nullptr);
 		if (Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP)
 		{
-			std::unique_ptr<uint8_t[]> BufferTemp(new uint8_t[DNSCurveParameter.DNSCurvePayloadSize - DNSCRYPT_BUFFER_RESERVED_LEN]());
+			auto BufferTemp = std::make_unique<uint8_t[]>(DNSCurveParameter.DNSCurvePayloadSize - DNSCRYPT_BUFFER_RESERVED_LEN);
 			sodium_memzero(BufferTemp.get(), DNSCurveParameter.DNSCurvePayloadSize - DNSCRYPT_BUFFER_RESERVED_LEN);
 			std::swap(Buffer, BufferTemp);
 		}
@@ -729,7 +729,9 @@ ssize_t DNSCurvePacketDecryption(
 		REQUEST_PROCESS_TYPE::DNSCURVE_MAIN, 
 		OriginalRecv, 
 		DataLength, 
-		RecvSize);
+		RecvSize, 
+		nullptr, 
+		nullptr);
 	if (DataLength < static_cast<ssize_t>(DNS_PACKET_MINSIZE))
 		return EXIT_FAILURE;
 
@@ -755,12 +757,12 @@ bool DNSCruveGetSignatureData(
 				return false;
 
 		//Check signature.
-			std::unique_ptr<uint8_t[]> DeBuffer(new uint8_t[NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES]());
-			memset(DeBuffer.get(), 0, NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
+			const auto DecryptBuffer = std::make_unique<uint8_t[]>(NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
+			memset(DecryptBuffer.get(), 0, NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
 			unsigned long long SignatureLength = 0;
 			if (PacketTarget == nullptr || 
 				crypto_sign_open(
-					reinterpret_cast<unsigned char *>(DeBuffer.get()), 
+					reinterpret_cast<unsigned char *>(DecryptBuffer.get()), 
 					&SignatureLength, 
 					reinterpret_cast<const unsigned char *>(Buffer + sizeof(dns_record_txt) + sizeof(dnscurve_txt_hdr)), 
 					reinterpret_cast<const dns_record_txt *>(Buffer)->TXT_Length - sizeof(dnscurve_txt_hdr), 
@@ -783,11 +785,11 @@ bool DNSCruveGetSignatureData(
 		//Signature available time check
 			const auto TimeValues = time(nullptr);
 			if (TimeValues > 0 && PacketTarget->ServerFingerprint != nullptr && 
-				TimeValues >= static_cast<time_t>(ntohl(reinterpret_cast<dnscurve_txt_signature *>(DeBuffer.get())->CertTime_Begin)) && 
-				TimeValues <= static_cast<time_t>(ntohl(reinterpret_cast<dnscurve_txt_signature *>(DeBuffer.get())->CertTime_End)))
+				TimeValues >= static_cast<time_t>(ntohl(reinterpret_cast<dnscurve_txt_signature *>(DecryptBuffer.get())->CertTime_Begin)) && 
+				TimeValues <= static_cast<time_t>(ntohl(reinterpret_cast<dnscurve_txt_signature *>(DecryptBuffer.get())->CertTime_End)))
 			{
-				memcpy_s(PacketTarget->SendMagicNumber, DNSCURVE_MAGIC_QUERY_LEN, reinterpret_cast<dnscurve_txt_signature *>(DeBuffer.get())->MagicNumber, DNSCURVE_MAGIC_QUERY_LEN);
-				memcpy_s(PacketTarget->ServerFingerprint, crypto_box_PUBLICKEYBYTES, reinterpret_cast<dnscurve_txt_signature *>(DeBuffer.get())->PublicKey, crypto_box_PUBLICKEYBYTES);
+				memcpy_s(PacketTarget->SendMagicNumber, DNSCURVE_MAGIC_QUERY_LEN, reinterpret_cast<dnscurve_txt_signature *>(DecryptBuffer.get())->MagicNumber, DNSCURVE_MAGIC_QUERY_LEN);
+				memcpy_s(PacketTarget->ServerFingerprint, crypto_box_PUBLICKEYBYTES, reinterpret_cast<dnscurve_txt_signature *>(DecryptBuffer.get())->PublicKey, crypto_box_PUBLICKEYBYTES);
 				if (!DNSCurveParameter.IsClientEphemeralKey)
 				{
 					if (crypto_box_beforenm(

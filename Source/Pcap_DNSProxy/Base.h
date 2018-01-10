@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -259,15 +259,15 @@ uint16_t GetChecksum(
 	const uint16_t *Buffer, 
 	const size_t Length);
 uint16_t GetChecksum_ICMPv6(
+	const ipv6_hdr * const IPv6_Header, 
 	const uint8_t * const Buffer, 
-	const size_t Length, 
-	const in6_addr &Destination, 
-	const in6_addr &Source);
+	const size_t Length);
 uint16_t GetChecksum_TCP_UDP(
 	const uint16_t Protocol_Network, 
 	const uint16_t Protocol_Transport, 
 	const uint8_t * const Buffer, 
-	const size_t Length);
+	const size_t Length, 
+	const size_t DataOffset);
 size_t AddLengthDataToHeader(
 	uint8_t * const Buffer, 
 	const size_t RecvLen, 
@@ -411,7 +411,9 @@ size_t CheckResponseData(
 	const REQUEST_PROCESS_TYPE ResponseType, 
 	uint8_t * const Buffer, 
 	const size_t Length, 
-	const size_t BufferSize);
+	const size_t BufferSize, 
+	size_t * const Packet_EDNS_PayloadSize, 
+	size_t * const Packet_EDNS_RecordLength);
 
 //Proxy.h
 size_t SOCKS_TCP_Request(

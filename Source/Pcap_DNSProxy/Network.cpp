@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2017 Chengr28
+// Copyright (C) 2012-2018 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -349,13 +349,32 @@ bool SocketSetting(
 			}
 		#endif
 		}break;
+	//Socket attribute setting(TCP No Delay)
+		case SOCKET_SETTING_TYPE::TCP_NO_DELAY:
+		{
+		#if defined(PLATFORM_WIN)
+			const BOOL OptionValue = TRUE;
+		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			const int OptionValue = TRUE;
+		#endif
+			if (setsockopt(Socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&OptionValue), sizeof(OptionValue)) == SOCKET_ERROR)
+			{
+				if (IsPrintError)
+					PrintError(LOG_LEVEL_TYPE::LEVEL_2, LOG_ERROR_TYPE::NETWORK, L"Socket no delay mode settings error", WSAGetLastError(), nullptr, 0);
+				shutdown(Socket, SD_BOTH);
+				closesocket(Socket);
+				Socket = INVALID_SOCKET;
+
+				return false;
+			}
+		}break;
 	//Socket attribute setting(TFO/TCP Fast Open)
 		case SOCKET_SETTING_TYPE::TCP_FAST_OPEN:
 		{
 		//Socket attribute settings process
 			if (Parameter.TCP_FastOpen > 0)
 			{
-			//Windows: Server side is completed, client side is only support overlapped I/O. Waiting Microsoft extend to normal socket(2017-06-21).
+			//Windows: Server side is completed, client side is only support overlapped I/O. Waiting Microsoft extend to normal socket(2018-01-07).
 			//Linux: Server side and client side are both completed, also support queue length.
 			//macOS: Server side and client side are both completed.
 			#if defined(PLATFORM_WIN)
@@ -372,12 +391,12 @@ bool SocketSetting(
 					return false;
 				}
 			#endif
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFOEM_MACOS))
+			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				errno = 0;
 			#if defined(PLATFORM_LINUX)
 				const int OptionValue = Parameter.TCP_FastOpen;
 				if (setsockopt(Socket, SOL_TCP, TCP_FASTOPEN, reinterpret_cast<const char *>(&OptionValue), sizeof(OptionValue)) == SOCKET_ERROR)
-			#elif defined(PLATFOEM_MACOS)
+			#elif defined(PLATFORM_MACOS)
 				const int OptionValue = TRUE;
 				if (setsockopt(Socket, IPPROTO_TCP, TCP_FASTOPEN, reinterpret_cast<const char *>(&OptionValue), sizeof(OptionValue)) == SOCKET_ERROR)
 			#endif
@@ -650,7 +669,7 @@ size_t SelectTargetSocketSingle(
 			if (!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::INVALID_CHECK, true, nullptr) || 
 				(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+				(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 			{
 				SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
 				return EXIT_FAILURE;
@@ -689,7 +708,7 @@ size_t SelectTargetSocketSingle(
 			if (!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::INVALID_CHECK, true, nullptr) || 
 				(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+				(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 			{
 				SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
 				return EXIT_FAILURE;
@@ -783,7 +802,7 @@ size_t SelectTargetSocketSingle(
 			if (!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::INVALID_CHECK, true, nullptr) || 
 				(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+				(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 			{
 				SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
 				return EXIT_FAILURE;
@@ -876,7 +895,7 @@ size_t SelectTargetSocketSingle(
 			if (!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::INVALID_CHECK, true, nullptr) || 
 				(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-				!SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+				(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 			{
 				SocketSetting(TargetSocketData->Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
 				return EXIT_FAILURE;
@@ -1032,7 +1051,7 @@ bool SelectTargetSocketMultiple(
 					(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 					!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::NON_BLOCKING_MODE, true, nullptr) || 
 					!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-					!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+					(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 				{
 					for (auto &SocketDataIter:TargetSocketDataList)
 						SocketSetting(SocketDataIter.Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
@@ -1059,7 +1078,7 @@ bool SelectTargetSocketMultiple(
 					(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 					!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::NON_BLOCKING_MODE, true, nullptr) || 
 					!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-					!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+					(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 				{
 					for (auto &SocketDataIter:TargetSocketDataList)
 						SocketSetting(SocketDataIter.Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
@@ -1088,7 +1107,7 @@ bool SelectTargetSocketMultiple(
 						(Protocol == IPPROTO_TCP && !SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::TCP_FAST_OPEN, true, nullptr)) || 
 						!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::NON_BLOCKING_MODE, true, nullptr) || 
 						!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::HOP_LIMITS_IPV4, true, nullptr) || 
-						!SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr))
+						(Protocol == IPPROTO_UDP && !SocketSetting(TargetSocketData.Socket, SOCKET_SETTING_TYPE::DO_NOT_FRAGMENT, true, nullptr)))
 					{
 						for (auto &SocketDataIter:TargetSocketDataList)
 							SocketSetting(SocketDataIter.Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
@@ -1270,7 +1289,13 @@ ssize_t SocketSelectingOnce(
 	if (RequestType == REQUEST_PROCESS_TYPE::DNSCURVE_MAIN)
 	{
 		if (DNSCurveSocketSelectingDataList == nullptr)
+		{
+		//Close all sockets.
+			for (auto &SocketDataIter:SocketDataList)
+				SocketSetting(SocketDataIter.Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
+
 			return EXIT_FAILURE;
+		}
 	}
 #endif
 
@@ -1323,7 +1348,7 @@ ssize_t SocketSelectingOnce(
 	#endif
 		)
 	{
-		std::unique_ptr<uint8_t[]> RecvBufferSwap(new uint8_t[NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES]());
+		auto RecvBufferSwap = std::make_unique<uint8_t[]>(NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
 		memset(RecvBufferSwap.get(), 0, NORMAL_PACKET_MAXSIZE + PADDING_RESERVED_BYTES);
 		std::swap(RecvBufferTemp, RecvBufferSwap);
 	}
@@ -1545,7 +1570,7 @@ ssize_t SocketSelectingOnce(
 					//Buffer initialization
 						if (!DNSCurveSocketSelectingDataList->at(Index).RecvBuffer)
 						{
-							std::unique_ptr<uint8_t[]> DNSCurveRecvBuffer(new uint8_t[RecvSize + PADDING_RESERVED_BYTES]());
+							auto DNSCurveRecvBuffer = std::make_unique<uint8_t[]>(RecvSize + PADDING_RESERVED_BYTES);
 							sodium_memzero(DNSCurveRecvBuffer.get(), RecvSize);
 							std::swap(DNSCurveSocketSelectingDataList->at(Index).RecvBuffer, DNSCurveRecvBuffer);
 						}
@@ -1609,7 +1634,7 @@ ssize_t SocketSelectingOnce(
 						//Buffer initialization
 							if (!SocketSelectingDataList.at(Index).RecvBuffer)
 							{
-								std::unique_ptr<uint8_t[]> RecvBufferSwap(new uint8_t[RecvSize + PADDING_RESERVED_BYTES]());
+								auto RecvBufferSwap = std::make_unique<uint8_t[]>(RecvSize + PADDING_RESERVED_BYTES);
 								memset(RecvBufferSwap.get(), 0, RecvSize);
 								std::swap(SocketSelectingDataList.at(Index).RecvBuffer, RecvBufferSwap);
 							}
@@ -1917,7 +1942,9 @@ ssize_t SelectingResultOnce(
 					RequestType, 
 					SocketSelectingDataList->at(Index).RecvBuffer.get(), 
 					RecvLen, 
-					RecvSize);
+					RecvSize, 
+					nullptr, 
+					nullptr);
 				if (RecvLen < static_cast<ssize_t>(DNS_PACKET_MINSIZE))
 				{
 					SocketSetting(SocketDataList.at(Index).Socket, SOCKET_SETTING_TYPE::CLOSE, false, nullptr);
@@ -2294,7 +2321,7 @@ StopLoop:
 					//Prepare buffer.
 						if (!SocketSelectingDataList.at(Index).RecvBuffer)
 						{
-							std::unique_ptr<uint8_t[]> RecvBuffer(new uint8_t[Parameter.LargeBufferSize + PADDING_RESERVED_BYTES]());
+							auto RecvBuffer = std::make_unique<uint8_t[]>(Parameter.LargeBufferSize + PADDING_RESERVED_BYTES);
 							memset(RecvBuffer.get(), 0, Parameter.LargeBufferSize + PADDING_RESERVED_BYTES);
 							std::swap(SocketSelectingDataList.at(Index).RecvBuffer, RecvBuffer);
 							SocketSelectingDataList.at(Index).RecvSize = Parameter.LargeBufferSize;
@@ -2302,7 +2329,7 @@ StopLoop:
 						}
 						else if (SocketSelectingDataList.at(Index).RecvSize <= SocketSelectingDataList.at(Index).RecvLen + Parameter.LargeBufferSize)
 						{
-							std::unique_ptr<uint8_t[]> RecvBuffer(new uint8_t[SocketSelectingDataList.at(Index).RecvSize + Parameter.LargeBufferSize]());
+							auto RecvBuffer = std::make_unique<uint8_t[]>(SocketSelectingDataList.at(Index).RecvSize + Parameter.LargeBufferSize);
 							memset(RecvBuffer.get(), 0, SocketSelectingDataList.at(Index).RecvSize + Parameter.LargeBufferSize);
 							memcpy_s(RecvBuffer.get(), SocketSelectingDataList.at(Index).RecvSize + Parameter.LargeBufferSize, SocketSelectingDataList.at(Index).RecvBuffer.get(), SocketSelectingDataList.at(Index).RecvLen);
 							std::swap(SocketSelectingDataList.at(Index).RecvBuffer, RecvBuffer);

@@ -1,12 +1,23 @@
-﻿Pcap_DNSProxy 0.4.9.5 更新日志(2017-11-02)：
+﻿Pcap_DNSProxy 0.4.9.5 更新日志(2018-01-07)：
 
-* 完整的 EDNS 标签透明穿透支持
-* 改进使用 LibSodium 时的行为，增强安全性
-* 改进对包含 DNSSEC 的过滤算法
+* 添加完整的 EDNS 标签透明转发支持
+* C++ 最低标准要求更新到 14
+* LibSodium 更新到 1.0.16 (Windows/macOS)
+* OpenSSL 更新到 1.1.0g (macOS)
+* 修正 EDNS Lebel 参数对 All 行为的支持 [muink]
+* 修正对 DNSSEC 数据包的过滤算法 [ZeroClover]
+* 修正初始化 LibSodium 时的行为，增强安全性
+* 修正抓包模块对 IPv4/IPv6 分片数据包的支持
+* 修正包含 DNSSEC 相关记录的过滤算法
   * DNSSEC Force Validation 改名为 DNSSEC Force Record
+* 修复 SOCKS Username 和 SOCKS Password 参数读取的问题 [ダクネスExplosion]
+* 修正脚本对文件描述符的软性限制 (Linux) [lunzima]
+* 提升 CMake 版本要求到 3.1 (Linux/macOS)
 * 移除 IPv4 Data Filter 参数
 * 移除 DNSSEC Validation 参数
-  * 注意：本工具从未有支持 DNSSEC 完整验证，此前仅检查是否存在 DNSSEC 相关资源记录，而此功能已整合到 DNS Data Filter 参数中。为避免名称上的误导，特此移除！
+  * 注意：本工具从未有支持 DNSSEC 完整验证，仅检查是否存在 DNSSEC 相关资源记录，而此功能已整合到 DNS Data Filter 参数中。为避免名称上的误导，特此移除！
+* 移除 Strict Resource Record TTL Filter 参数
+  * 注意：此参数的所有功能需要强制启用，为避免名称上的误导，特此移除！
 * Release Hash:
   * SHA-3(256):
     * Windows/Pcap_DNSProxy.exe: 

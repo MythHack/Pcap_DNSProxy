@@ -1,12 +1,23 @@
-﻿Pcap_DNSProxy 0.4.9.5 changelog(2017-11-02)：
+﻿Pcap_DNSProxy 0.4.9.5 changelog(2018-01-07)：
 
-* Completed EDNS Label transparency support.
-* Improve operation when using LibSodium.
-* Improve operation when using DNSSEC.
+* Add EDNS Label transparency support.
+* The minimum C++ standard requires 14 now.
+* LibSodium upgrade to version 1.0.16. (Windows/macOS)
+* OpenSSL upgrade to version 1.1.0g. (macOS)
+* Fix "All" operation in EDNS Lebel parameter. [muink]
+* Fix packet filter with DNSSEC. [ZeroClover]
+* Fix LibSodium initialization.
+* Fix IPv4/IPv6 fragment support of capture module.
+* Fix DNSSEC records filter.
   * Rename from DNSSEC Force Validation to DNSSEC Force Record.
+* Fix bug of SOCKS Username and SOCKS Password parameter. [ダクネスExplosion]
+* Fix number of file descriptor limit in scripts. (Linux) [lunzima]
+* CMake version require 3.1 now. (Linux/macOS)
 * Remove IPv4 Data Filter parameter.
 * Remove DNSSEC Validation parameter.
   * Notice: All features have been moved to DNS Data Filter.
+* Remove Strict Resource Record TTL Filter parameter.
+  * Notice: All features need to be forced enable.
 * Release Hash:
   * SHA-3(256):
     * Windows/Pcap_DNSProxy.exe: 
@@ -78,7 +89,7 @@ Pcap_DNSProxy 0.4.8.5-0.4.9.0 changelog(2017-06-03):
 * Project IDE Visual Studio upgrade to version 2017. (Windows)
 * Fix last character of text file is ignored problem. [冰靈曦曉]
 * Fix bug of disable IPv6 protocol operation. [dzxx36gyy]
-* Fix Cache Parameter parameter bug. [LisonFan]
+* Fix Cache Parameter parameter error. [LisonFan]
 * Fix EDNS Client Subnet prefix length is non-compliant with RFC standard. [LisonFan]
 * Fix -c/--config-file parameter.
 * Network status check will do again when configuration files were reloaded.
